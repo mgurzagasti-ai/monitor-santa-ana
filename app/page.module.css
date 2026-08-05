@@ -18,36 +18,45 @@
   background: var(--panel);
   border-right: 1px solid var(--line);
   box-shadow: 10px 0 28px rgba(15, 23, 42, 0.16);
-  transform: translateX(calc(-100% + 48px));
+  transform: translateX(-100%);
   transition: transform 180ms ease;
   z-index: 500;
 }
 
-.sidebar:hover,
-.sidebar:focus-within {
+.sidebarOpen {
   transform: translateX(0);
 }
 
-.sidebar::after {
-  content: "Monitor";
+.sidebarToggle {
   position: fixed;
   top: 50%;
-  right: 0;
+  left: 0;
   width: 48px;
   height: 132px;
   display: grid;
   place-items: center;
+  gap: 8px;
   border: 1px solid var(--line);
-  border-right: 0;
+  border-left: 0;
   border-radius: 0 8px 8px 0;
   background: var(--panel);
   color: var(--accent-dark);
+  cursor: pointer;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
-  transform: translate(100%, -50%) rotate(180deg);
+  transform: translateY(-50%);
   writing-mode: vertical-rl;
+  z-index: 450;
+}
+
+.sidebarToggle svg {
+  transform: rotate(90deg);
+}
+
+.sidebarToggleHidden {
+  display: none;
 }
 
 .header {
@@ -55,6 +64,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
 }
 
 .header h1 {

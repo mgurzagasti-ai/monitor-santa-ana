@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, Power, RefreshCcw, Satellite } from "lucide-react";
+import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, PanelLeftClose, PanelLeftOpen, Power, RefreshCcw, Satellite } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 
@@ -68,6 +68,7 @@ export default function Home() {
   const [internalDraft, setInternalDraft] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const selectedVehicle = useMemo(() => {
     return fleet.vehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? fleet.vehicles[0] ?? null;
@@ -161,17 +162,39 @@ export default function Home() {
     setInternalDraft(selectedAssignment?.internalNumber ?? selectedVehicle?.internalNumber ?? "");
   }, [selectedAssignment?.internalNumber, selectedVehicle?.deviceId, selectedVehicle?.internalNumber]);
 
+  useEffect(() => {
+    const assignedLineId = selectedAssignment?.assignedLineId ?? selectedVehicle?.assignedLineId;
+    if (!assignedLineId) return;
+
+    setShowLineRoutes(true);
+    setSelectedLineRouteIds([assignedLineId]);
+  }, [selectedAssignment?.assignedLineId, selectedVehicle?.assignedLineId, selectedVehicle?.deviceId]);
+
   return (
     <main className={styles.shell}>
-      <aside className={styles.sidebar}>
+      <button
+        className={`${styles.sidebarToggle} ${sidebarOpen ? styles.sidebarToggleHidden : ""}`}
+        onClick={() => setSidebarOpen(true)}
+        title="Abrir monitor"
+        aria-label="Abrir monitor"
+      >
+        <PanelLeftOpen size={18} />
+        <span>Monitor</span>
+      </button>
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}>
         <header className={styles.header}>
           <div>
             <span className={styles.eyebrow}>Santa Ana</span>
             <h1>Monitor de flota</h1>
           </div>
-          <button className={styles.iconButton} onClick={loadFleet} title="Actualizar">
-            <RefreshCcw size={18} className={loading ? styles.spin : undefined} />
-          </button>
+          <div className={styles.headerActions}>
+            <button className={styles.iconButton} onClick={loadFleet} title="Actualizar">
+              <RefreshCcw size={18} className={loading ? styles.spin : undefined} />
+            </button>
+            <button className={styles.iconButton} onClick={() => setSidebarOpen(false)} title="Cerrar monitor">
+              <PanelLeftClose size={18} />
+            </button>
+          </div>
         </header>
 
         <section className={styles.statusGrid}>
