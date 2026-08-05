@@ -6,7 +6,7 @@ import { fetchPositions, getConfig } from "../traccar";
 export async function GET() {
   try {
     const config = getConfig();
-    const assignments = readAssignments();
+    const assignments = await readAssignments();
     const positions = await fetchPositions("/api/positions");
     const vehicles = (
       await Promise.all(

@@ -4,7 +4,7 @@ import { readAssignments, upsertAssignment, type VehicleAssignment } from "@/app
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ assignments: readAssignments(), updatedAt: new Date().toISOString() });
+  return NextResponse.json({ assignments: await readAssignments(), updatedAt: new Date().toISOString() });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -27,14 +27,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Falta linea asignada" }, { status: 400 });
     }
 
-    const assignment = upsertAssignment({
+    const assignment = await upsertAssignment({
       deviceId,
       internalNumber,
       label,
       assignedLineId
     });
 
-    return NextResponse.json({ assignment, assignments: readAssignments(), updatedAt: new Date().toISOString() });
+    return NextResponse.json({ assignment, assignments: await readAssignments(), updatedAt: new Date().toISOString() });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error" },
