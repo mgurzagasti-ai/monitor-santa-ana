@@ -159,16 +159,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setInternalDraft(selectedAssignment?.internalNumber ?? selectedVehicle?.internalNumber ?? "");
-  }, [selectedAssignment?.internalNumber, selectedVehicle?.deviceId, selectedVehicle?.internalNumber]);
+    setInternalDraft(selectedVehicle?.internalNumber ?? selectedAssignment?.internalNumber ?? "");
+  }, [selectedVehicle?.internalNumber, selectedVehicle?.deviceId, selectedAssignment?.internalNumber]);
 
   useEffect(() => {
-    const assignedLineId = selectedAssignment?.assignedLineId ?? selectedVehicle?.assignedLineId;
+    const assignedLineId = selectedVehicle?.assignedLineId ?? selectedAssignment?.assignedLineId;
     if (!assignedLineId) return;
 
     setShowLineRoutes(true);
     setSelectedLineRouteIds([assignedLineId]);
-  }, [selectedAssignment?.assignedLineId, selectedVehicle?.assignedLineId, selectedVehicle?.deviceId]);
+  }, [selectedVehicle?.assignedLineId, selectedAssignment?.assignedLineId, selectedVehicle?.deviceId]);
 
   return (
     <main className={styles.shell}>
@@ -241,14 +241,14 @@ export default function Home() {
               <input
                 value={internalDraft}
                 onChange={(event) => setInternalDraft(event.target.value)}
-                onBlur={() => saveAssignment(selectedAssignment?.assignedLineId ?? selectedVehicle.assignedLineId ?? "49bis")}
+                onBlur={() => saveAssignment(selectedVehicle.assignedLineId ?? selectedAssignment?.assignedLineId ?? "49bis")}
                 placeholder="230"
               />
             </label>
             <label className={styles.field}>
               <span>Linea</span>
               <select
-                value={selectedAssignment?.assignedLineId ?? selectedVehicle.assignedLineId ?? ""}
+                value={selectedVehicle.assignedLineId ?? selectedAssignment?.assignedLineId ?? ""}
                 onChange={(event) => saveAssignment(event.target.value)}
               >
                 {lineRoutesWithPaths.map((line) => (
