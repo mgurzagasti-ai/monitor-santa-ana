@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readAssignments, upsertAssignment, type VehicleAssignment } from "@/app/data/assignments";
+import { invalidateFleetCache } from "@/app/data/fleet";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export async function PATCH(request: NextRequest) {
       label,
       assignedLineId
     });
+    await invalidateFleetCache();
 
     return NextResponse.json({ assignment, assignments: await readAssignments(), updatedAt: new Date().toISOString() });
   } catch (error) {

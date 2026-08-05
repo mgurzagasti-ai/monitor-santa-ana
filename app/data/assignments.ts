@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { isRedisConfigured, redisCommand } from "./redis";
 
 export type VehicleAssignment = {
   deviceId: number;
@@ -64,29 +65,6 @@ async function readRedisAssignments(): Promise<VehicleAssignment[] | null> {
 async function writeRedisAssignments(assignments: VehicleAssignment[]) {
   if (!isRedisConfigured()) return;
   await redisCommand(["SET", assignmentsRedisKey, JSON.stringify(assignments)]);
-}
-
-function isRedisConfigured() {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-}
-
-async function redisCommand<T>(command: string[]): Promise<T> {
-  const response = await fetch(process.env.UPSTASH_REDIS_REST_URL!, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(command),
-    cache: "no-store"
-  });
-
-  const body = (await response.json()) as { result?: T; error?: string };
-  if (!response.ok || body.error) {
-    throw new Error(body.error ?? `Upstash HTTP ${response.status}`);
-  }
-
-  return body.result as T;
 }
 
 function isAssignment(value: VehicleAssignment) {
