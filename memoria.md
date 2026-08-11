@@ -41,3 +41,23 @@
 - Pendiente recomendado: crear modo edicion desde el monitor para agregar paradas haciendo clic en el mapa, seleccionando linea, nombre, sentido y orden; guardar en JSON o base de datos.
 - Commit/push realizado: `f9330ef Add line stops support to monitor` en `mgurzagasti-ai/monitor-santa-ana`.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-08-11 - Editor de paradas en monitor
+
+- Se implemento modo edicion de paradas desde el panel lateral del monitor.
+- El boton de `+` en el encabezado, o `Editar` dentro de `Paradas cercanas`, abre el editor.
+- Flujo de carga:
+  - elegir linea;
+  - completar nombre;
+  - elegir sentido `Ida`, `Vuelta` o `Ida y vuelta`;
+  - opcionalmente poner orden;
+  - hacer clic en el mapa para tomar latitud/longitud;
+  - guardar parada.
+- Las paradas se persisten en `app/data/lineStops.json`.
+- `/api/line-stops` ahora permite:
+  - `GET` para listar;
+  - `POST` para crear;
+  - `DELETE ?id=...` para borrar.
+- `/api/public/line-stops` sigue siendo de lectura para la APK.
+- Se probo crear y borrar una parada temporal por API en `localhost:3002`; el archivo quedo nuevamente con `[]`.
+- Verificacion: `npm.cmd run build` termino correctamente.

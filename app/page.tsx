@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, PanelLeftClose, PanelLeftOpen, Power, RefreshCcw, Satellite } from "lucide-react";
+import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, PanelLeftClose, PanelLeftOpen, Plus, Power, RefreshCcw, Save, Satellite, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 
@@ -71,6 +71,15 @@ type VehicleAssignment = {
   assignedLineId: string;
 };
 
+type StopDraft = {
+  name: string;
+  lineId: string;
+  direction: LineStop["direction"];
+  order: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 export default function Home() {
   const [fleet, setFleet] = useState<FleetResponse>({ vehicles: [], updatedAt: "" });
   const [lineRoutes, setLineRoutes] = useState<LineRoute[]>([]);
@@ -78,9 +87,20 @@ export default function Home() {
   const [assignments, setAssignments] = useState<VehicleAssignment[]>([]);
   const [showLineRoutes, setShowLineRoutes] = useState(true);
   const [showLineStops, setShowLineStops] = useState(true);
+  const [stopEditorOpen, setStopEditorOpen] = useState(false);
+  const [savingStop, setSavingStop] = useState(false);
+  const [stopMessage, setStopMessage] = useState("");
   const [selectedLineRouteIds, setSelectedLineRouteIds] = useState<string[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [internalDraft, setInternalDraft] = useState("");
+  const [stopDraft, setStopDraft] = useState<StopDraft>({
+    name: "",
+    lineId: "",
+    direction: "ambos",
+    order: "",
+    latitude: null,
+    longitude: null
+  });
   const [savingAssignment, setSavingAssignment] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -122,10 +142,116 @@ export default function Home() {
     return assignments.find((assignment) => assignment.deviceId === selectedVehicle.deviceId) ?? null;
   }, [assignments, selectedVehicle]);
 
+  const selectedStopLine = useMemo(() => {
+    return lineRoutes.find((line) => line.id === stopDraft.lineId) ?? lineRoutesWithPaths[0] ?? null;
+  }, [lineRoutes, lineRoutesWithPaths, stopDraft.lineId]);
+
+  const editableLineStops = useMemo(() => {
+    if (!selectedStopLine) return [];
+    return lineStops
+      .filter((stop) => stop.lineId === selectedStopLine.id)
+      .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name));
+  }, [lineStops, selectedStopLine]);
+
+  const draftStopMarker = useMemo(() => {
+    if (!stopEditorOpen || !selectedStopLine || stopDraft.latitude == null || stopDraft.longitude == null) return null;
+    return {
+      latitude: stopDraft.latitude,
+      longitude: stopDraft.longitude,
+      lineName: selectedStopLine.name,
+      color: selectedStopLine.color
+    };
+  }, [selectedStopLine, stopDraft.latitude, stopDraft.longitude, stopEditorOpen]);
+
   function toggleLineRoute(lineId: string) {
     setSelectedLineRouteIds((current) =>
       current.includes(lineId) ? current.filter((id) => id !== lineId) : [...current, lineId]
     );
+  }
+
+  function updateStopLine(lineId: string) {
+    setStopDraft((current) => ({ ...current, lineId }));
+    setShowLineRoutes(true);
+    setShowLineStops(true);
+    setSelectedLineRouteIds([lineId]);
+  }
+
+  function openStopEditor() {
+    const lineId = stopDraft.lineId || selectedVehicle?.assignedLineId || selectedLineRouteIds[0] || lineRoutesWithPaths[0]?.id || "";
+    setStopEditorOpen(true);
+    setShowLineStops(true);
+    setStopMessage(lineId ? "Hace clic en el mapa para ubicar la parada." : "Primero tiene que cargar un recorrido de linea.");
+    if (lineId) {
+      updateStopLine(lineId);
+    }
+  }
+
+  function closeStopEditor() {
+    setStopEditorOpen(false);
+    setStopMessage("");
+  }
+
+  function handleStopMapClick(point: { latitude: number; longitude: number }) {
+    if (!stopEditorOpen) return;
+    setStopDraft((current) => ({
+      ...current,
+      latitude: point.latitude,
+      longitude: point.longitude
+    }));
+    setStopMessage("Punto marcado. Completa el nombre y guarda la parada.");
+  }
+
+  async function saveStop() {
+    if (!stopDraft.lineId || stopDraft.latitude == null || stopDraft.longitude == null || !stopDraft.name.trim()) {
+      setStopMessage("Falta linea, nombre o ubicacion en el mapa.");
+      return;
+    }
+
+    setSavingStop(true);
+    try {
+      const response = await fetch("/api/line-stops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineId: stopDraft.lineId,
+          name: stopDraft.name,
+          latitude: stopDraft.latitude,
+          longitude: stopDraft.longitude,
+          direction: stopDraft.direction,
+          order: stopDraft.order ? Number(stopDraft.order) : undefined
+        })
+      });
+      const data = (await response.json()) as { stops?: LineStop[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar la parada");
+      setLineStops(data.stops ?? []);
+      setStopDraft((current) => ({
+        ...current,
+        name: "",
+        order: "",
+        latitude: null,
+        longitude: null
+      }));
+      setStopMessage("Parada guardada.");
+    } catch (error) {
+      setStopMessage(error instanceof Error ? error.message : "No se pudo guardar la parada");
+    } finally {
+      setSavingStop(false);
+    }
+  }
+
+  async function deleteStop(stopId: string) {
+    setSavingStop(true);
+    try {
+      const response = await fetch(`/api/line-stops?id=${encodeURIComponent(stopId)}`, { method: "DELETE" });
+      const data = (await response.json()) as { stops?: LineStop[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo borrar la parada");
+      setLineStops(data.stops ?? []);
+      setStopMessage("Parada borrada.");
+    } catch (error) {
+      setStopMessage(error instanceof Error ? error.message : "No se pudo borrar la parada");
+    } finally {
+      setSavingStop(false);
+    }
   }
 
   async function saveAssignment(nextLineId: string, nextInternalNumber = internalDraft) {
@@ -199,6 +325,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (stopDraft.lineId || lineRoutesWithPaths.length === 0) return;
+    const initialLineId = selectedVehicle?.assignedLineId || selectedLineRouteIds[0] || lineRoutesWithPaths[0].id;
+    setStopDraft((current) => ({ ...current, lineId: initialLineId }));
+  }, [lineRoutesWithPaths, selectedLineRouteIds, selectedVehicle?.assignedLineId, stopDraft.lineId]);
+
+  useEffect(() => {
     setInternalDraft(selectedVehicle?.internalNumber ?? selectedAssignment?.internalNumber ?? "");
   }, [selectedVehicle?.internalNumber, selectedVehicle?.deviceId, selectedAssignment?.internalNumber]);
 
@@ -230,6 +362,9 @@ export default function Home() {
           <div className={styles.headerActions}>
             <button className={styles.iconButton} onClick={loadFleet} title="Actualizar">
               <RefreshCcw size={18} className={loading ? styles.spin : undefined} />
+            </button>
+            <button className={styles.iconButton} onClick={stopEditorOpen ? closeStopEditor : openStopEditor} title="Editar paradas">
+              {stopEditorOpen ? <X size={18} /> : <Plus size={18} />}
             </button>
             <button className={styles.iconButton} onClick={() => setSidebarOpen(false)} title="Cerrar monitor">
               <PanelLeftClose size={18} />
@@ -330,7 +465,7 @@ export default function Home() {
           <section className={styles.stopsPanel}>
             <div className={styles.sectionHeader}>
               <span>Paradas cercanas</span>
-              <small>{selectedVehicleStops.length > 0 ? selectedVehicle.assignedLineName : "Pendiente"}</small>
+              <button onClick={openStopEditor}>Editar</button>
             </div>
             {selectedVehicleStops.length > 0 ? (
               <div className={styles.stopList}>
@@ -347,6 +482,78 @@ export default function Home() {
             ) : (
               <p className={styles.emptyState}>Sin paradas cargadas para esta linea.</p>
             )}
+          </section>
+        ) : null}
+
+        {stopEditorOpen ? (
+          <section className={styles.stopEditorPanel}>
+            <div className={styles.sectionHeader}>
+              <span>Editor de paradas</span>
+              <small>{savingStop ? "Guardando" : selectedStopLine?.number ?? "Linea"}</small>
+            </div>
+            <label className={styles.field}>
+              <span>Linea</span>
+              <select value={stopDraft.lineId} onChange={(event) => updateStopLine(event.target.value)}>
+                {lineRoutesWithPaths.map((line) => (
+                  <option key={line.id} value={line.id}>
+                    {line.number} - {line.name.replace(/^Linea\s+/i, "")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>Nombre</span>
+              <input
+                value={stopDraft.name}
+                onChange={(event) => setStopDraft((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Av. Almirante Brown y 1 de Marzo"
+              />
+            </label>
+            <div className={styles.editorGrid}>
+              <label className={styles.field}>
+                <span>Sentido</span>
+                <select
+                  value={stopDraft.direction}
+                  onChange={(event) => setStopDraft((current) => ({ ...current, direction: event.target.value as LineStop["direction"] }))}
+                >
+                  <option value="ambos">Ida y vuelta</option>
+                  <option value="ida">Ida</option>
+                  <option value="vuelta">Vuelta</option>
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>Orden</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={stopDraft.order}
+                  onChange={(event) => setStopDraft((current) => ({ ...current, order: event.target.value }))}
+                  placeholder="1"
+                />
+              </label>
+            </div>
+            <div className={styles.coordsBox}>
+              <MapPin size={16} />
+              <span>{formatDraftCoordinates(stopDraft.latitude, stopDraft.longitude)}</span>
+            </div>
+            <button className={styles.primaryButton} onClick={saveStop} disabled={savingStop}>
+              <Save size={17} />
+              <span>Guardar parada</span>
+            </button>
+            {stopMessage ? <p className={styles.editorHint}>{stopMessage}</p> : null}
+            <div className={styles.stopList}>
+              {editableLineStops.map((stop) => (
+                <div key={stop.id} className={styles.stopRow}>
+                  <span>
+                    <strong>{stop.order ? `${stop.order}. ${stop.name}` : stop.name}</strong>
+                    <small>{formatDirection(stop.direction)}</small>
+                  </span>
+                  <button className={styles.dangerIconButton} onClick={() => deleteStop(stop.id)} title="Borrar parada">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </section>
         ) : null}
 
@@ -388,6 +595,9 @@ export default function Home() {
           selectedDeviceId={selectedVehicle?.deviceId ?? null}
           lineRoutes={visibleLineRoutes}
           lineStops={visibleLineStops}
+          stopEditorEnabled={stopEditorOpen}
+          draftStop={draftStopMarker}
+          onMapClick={handleStopMapClick}
         />
       </section>
     </main>
@@ -456,4 +666,9 @@ function formatDistance(value: number) {
 function formatDirection(direction: LineStop["direction"]) {
   if (direction === "ambos") return "ida y vuelta";
   return direction;
+}
+
+function formatDraftCoordinates(latitude: number | null, longitude: number | null) {
+  if (latitude == null || longitude == null) return "Hace clic en el mapa para elegir ubicacion";
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 }

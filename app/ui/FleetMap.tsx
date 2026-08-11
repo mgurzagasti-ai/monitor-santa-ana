@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type FleetVehicle = {
@@ -40,16 +40,29 @@ type LineStop = {
   color: string;
 };
 
+type DraftStop = {
+  latitude: number;
+  longitude: number;
+  lineName: string;
+  color: string;
+};
+
 export default function FleetMap({
   vehicles,
   selectedDeviceId,
   lineRoutes,
-  lineStops
+  lineStops,
+  stopEditorEnabled,
+  draftStop,
+  onMapClick
 }: {
   vehicles: FleetVehicle[];
   selectedDeviceId: number | null;
   lineRoutes: LineRoute[];
   lineStops: LineStop[];
+  stopEditorEnabled: boolean;
+  draftStop: DraftStop | null;
+  onMapClick: (point: { latitude: number; longitude: number }) => void;
 }) {
   const mapRef = useRef<L.Map | null>(null);
   const animatedVehicles = useAnimatedVehicles(vehicles);
@@ -74,6 +87,7 @@ export default function FleetMap({
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <MapSizeWatcher />
       <FollowPoint center={center} />
+      <StopClickHandler enabled={stopEditorEnabled} onMapClick={onMapClick} />
       {lineRoutes.flatMap((line) =>
         line.paths.map((path, index) => (
           <Polyline
@@ -90,11 +104,29 @@ export default function FleetMap({
       {lineStops.map((stop) => (
         <StopMarker key={stop.id} stop={stop} />
       ))}
+      {draftStop ? <DraftStopMarker stop={draftStop} /> : null}
       {animatedVehicles.map((vehicle) => (
         <VehicleMarker key={vehicle.deviceId} vehicle={vehicle} />
       ))}
     </MapContainer>
   );
+}
+
+function StopClickHandler({
+  enabled,
+  onMapClick
+}: {
+  enabled: boolean;
+  onMapClick: (point: { latitude: number; longitude: number }) => void;
+}) {
+  useMapEvents({
+    click(event) {
+      if (!enabled) return;
+      onMapClick({ latitude: event.latlng.lat, longitude: event.latlng.lng });
+    }
+  });
+
+  return null;
 }
 
 function useAnimatedVehicles(vehicles: FleetVehicle[]) {
@@ -229,6 +261,30 @@ function StopMarker({ stop }: { stop: LineStop }) {
         {stop.lineName || `Linea ${stop.lineNumber}`}
         <br />
         Sentido: {formatDirection(stop.direction)}
+      </Popup>
+    </CircleMarker>
+  );
+}
+
+function DraftStopMarker({ stop }: { stop: DraftStop }) {
+  return (
+    <CircleMarker
+      center={[stop.latitude, stop.longitude]}
+      radius={9}
+      pathOptions={{
+        color: "#111827",
+        dashArray: "4 4",
+        fillColor: stop.color,
+        fillOpacity: 0.8,
+        opacity: 1,
+        weight: 2
+      }}
+    >
+      <Tooltip sticky>Nueva parada - {stop.lineName}</Tooltip>
+      <Popup>
+        <strong>Nueva parada</strong>
+        <br />
+        {stop.lineName}
       </Popup>
     </CircleMarker>
   );

@@ -254,6 +254,16 @@
   background: #fff;
 }
 
+.stopEditorPanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
 .stopList {
   display: grid;
   gap: 8px;
@@ -300,6 +310,69 @@
   background: #fbfdfc;
   color: var(--muted);
   font-size: 13px;
+}
+
+.editorGrid {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 10px;
+}
+
+.coordsBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.coordsBox svg {
+  color: var(--accent-dark);
+  flex: 0 0 auto;
+}
+
+.primaryButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.editorHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.dangerIconButton {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff;
+  color: #b42318;
+  cursor: pointer;
 }
 
 .gpsStatus {
