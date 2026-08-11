@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type FleetVehicle = {
@@ -27,14 +27,29 @@ type LineRoute = {
   paths: [number, number][][];
 };
 
+type LineStop = {
+  id: string;
+  lineId: string;
+  lineNumber: string;
+  lineName: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  direction: "ida" | "vuelta" | "ambos";
+  order?: number;
+  color: string;
+};
+
 export default function FleetMap({
   vehicles,
   selectedDeviceId,
-  lineRoutes
+  lineRoutes,
+  lineStops
 }: {
   vehicles: FleetVehicle[];
   selectedDeviceId: number | null;
   lineRoutes: LineRoute[];
+  lineStops: LineStop[];
 }) {
   const mapRef = useRef<L.Map | null>(null);
   const animatedVehicles = useAnimatedVehicles(vehicles);
@@ -72,6 +87,9 @@ export default function FleetMap({
           </Polyline>
         ))
       )}
+      {lineStops.map((stop) => (
+        <StopMarker key={stop.id} stop={stop} />
+      ))}
       {animatedVehicles.map((vehicle) => (
         <VehicleMarker key={vehicle.deviceId} vehicle={vehicle} />
       ))}
@@ -189,6 +207,33 @@ function FollowPoint({ center }: { center: [number, number] }) {
   return null;
 }
 
+function StopMarker({ stop }: { stop: LineStop }) {
+  return (
+    <CircleMarker
+      center={[stop.latitude, stop.longitude]}
+      radius={7}
+      pathOptions={{
+        color: "#ffffff",
+        fillColor: stop.color,
+        fillOpacity: 0.95,
+        opacity: 1,
+        weight: 2
+      }}
+    >
+      <Tooltip sticky>
+        Parada {stop.lineNumber} - {stop.name}
+      </Tooltip>
+      <Popup>
+        <strong>{stop.name}</strong>
+        <br />
+        {stop.lineName || `Linea ${stop.lineNumber}`}
+        <br />
+        Sentido: {formatDirection(stop.direction)}
+      </Popup>
+    </CircleMarker>
+  );
+}
+
 function useVehicleIcon(vehicle: FleetVehicle) {
   return useMemo(() => {
     const label = vehicle.internalNumber?.trim() || vehicle.line;
@@ -220,6 +265,11 @@ function useVehicleIcon(vehicle: FleetVehicle) {
       iconAnchor: [31, 20]
     });
   }, [vehicle.internalNumber, vehicle.line]);
+}
+
+function formatDirection(direction: LineStop["direction"]) {
+  if (direction === "ambos") return "ida y vuelta";
+  return direction;
 }
 
 function VehicleMarker({ vehicle }: { vehicle: FleetVehicle }) {

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, PanelLeftClose, PanelLeftOpen, Power, RefreshCcw, Satellite } from "lucide-react";
+import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, PanelLeftClose, PanelLeftOpen, Power, RefreshCcw, Satellite } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 
@@ -51,6 +51,19 @@ type LineRoute = {
   error?: string;
 };
 
+type LineStop = {
+  id: string;
+  lineId: string;
+  lineNumber: string;
+  lineName: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  direction: "ida" | "vuelta" | "ambos";
+  order?: number;
+  color: string;
+};
+
 type VehicleAssignment = {
   deviceId: number;
   internalNumber: string;
@@ -61,8 +74,10 @@ type VehicleAssignment = {
 export default function Home() {
   const [fleet, setFleet] = useState<FleetResponse>({ vehicles: [], updatedAt: "" });
   const [lineRoutes, setLineRoutes] = useState<LineRoute[]>([]);
+  const [lineStops, setLineStops] = useState<LineStop[]>([]);
   const [assignments, setAssignments] = useState<VehicleAssignment[]>([]);
   const [showLineRoutes, setShowLineRoutes] = useState(true);
+  const [showLineStops, setShowLineStops] = useState(true);
   const [selectedLineRouteIds, setSelectedLineRouteIds] = useState<string[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [internalDraft, setInternalDraft] = useState("");
@@ -83,6 +98,24 @@ export default function Home() {
     if (selectedLineRouteIds.length === 0) return lineRoutesWithPaths;
     return lineRoutesWithPaths.filter((line) => selectedLineRouteIds.includes(line.id));
   }, [lineRoutesWithPaths, selectedLineRouteIds, showLineRoutes]);
+
+  const visibleLineStops = useMemo(() => {
+    if (!showLineStops) return [];
+    if (selectedLineRouteIds.length === 0) return lineStops;
+    return lineStops.filter((stop) => selectedLineRouteIds.includes(stop.lineId));
+  }, [lineStops, selectedLineRouteIds, showLineStops]);
+
+  const selectedVehicleStops = useMemo(() => {
+    if (!selectedVehicle?.assignedLineId) return [];
+    return lineStops
+      .filter((stop) => stop.lineId === selectedVehicle.assignedLineId)
+      .map((stop) => ({
+        ...stop,
+        distanceMeters: distanceMeters(selectedVehicle.latitude, selectedVehicle.longitude, stop.latitude, stop.longitude)
+      }))
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, 4);
+  }, [lineStops, selectedVehicle]);
 
   const selectedAssignment = useMemo(() => {
     if (!selectedVehicle) return null;
@@ -144,6 +177,12 @@ export default function Home() {
     setLineRoutes(data.routes ?? []);
   }
 
+  async function loadLineStops() {
+    const response = await fetch("/api/line-stops", { cache: "no-store" });
+    const data = (await response.json()) as { stops: LineStop[] };
+    setLineStops(data.stops ?? []);
+  }
+
   async function loadAssignments() {
     const response = await fetch("/api/assignments", { cache: "no-store" });
     const data = (await response.json()) as { assignments: VehicleAssignment[] };
@@ -153,6 +192,7 @@ export default function Home() {
   useEffect(() => {
     loadFleet();
     loadLineRoutes();
+    loadLineStops();
     loadAssignments();
     const timer = window.setInterval(loadFleet, 15000);
     return () => window.clearInterval(timer);
@@ -205,6 +245,13 @@ export default function Home() {
             <span>
               <small>Recorridos</small>
               <strong>{showLineRoutes ? routeSelectionLabel(selectedLineRouteIds.length) : "Ocultos"}</strong>
+            </span>
+          </button>
+          <button className={styles.metricButton} onClick={() => setShowLineStops((value) => !value)}>
+            {showLineStops ? <MapPin size={18} /> : <EyeOff size={18} />}
+            <span>
+              <small>Paradas</small>
+              <strong>{showLineStops ? lineStops.length.toString() : "Ocultas"}</strong>
             </span>
           </button>
         </section>
@@ -279,6 +326,30 @@ export default function Home() {
           </section>
         ) : null}
 
+        {selectedVehicle ? (
+          <section className={styles.stopsPanel}>
+            <div className={styles.sectionHeader}>
+              <span>Paradas cercanas</span>
+              <small>{selectedVehicleStops.length > 0 ? selectedVehicle.assignedLineName : "Pendiente"}</small>
+            </div>
+            {selectedVehicleStops.length > 0 ? (
+              <div className={styles.stopList}>
+                {selectedVehicleStops.map((stop) => (
+                  <div key={stop.id} className={styles.stopRow}>
+                    <span>
+                      <strong>{stop.name}</strong>
+                      <small>{formatDirection(stop.direction)}</small>
+                    </span>
+                    <b>{formatDistance(stop.distanceMeters)}</b>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.emptyState}>Sin paradas cargadas para esta linea.</p>
+            )}
+          </section>
+        ) : null}
+
         <section className={styles.linePicker}>
           <div className={styles.sectionHeader}>
             <span>Lineas</span>
@@ -316,6 +387,7 @@ export default function Home() {
           vehicles={fleet.vehicles}
           selectedDeviceId={selectedVehicle?.deviceId ?? null}
           lineRoutes={visibleLineRoutes}
+          lineStops={visibleLineStops}
         />
       </section>
     </main>
@@ -362,4 +434,26 @@ function formatAge(value: number | null | undefined) {
   if (value == null) return "-";
   if (value < 60) return `${value}s`;
   return `${Math.round(value / 60)}m`;
+}
+
+function distanceMeters(startLat: number, startLon: number, endLat: number, endLon: number) {
+  const earthRadius = 6371000;
+  const lat1 = (startLat * Math.PI) / 180;
+  const lat2 = (endLat * Math.PI) / 180;
+  const deltaLat = ((endLat - startLat) * Math.PI) / 180;
+  const deltaLon = ((endLon - startLon) * Math.PI) / 180;
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(value: number) {
+  if (value < 1000) return `${Math.round(value)} m`;
+  return `${(value / 1000).toFixed(1)} km`;
+}
+
+function formatDirection(direction: LineStop["direction"]) {
+  if (direction === "ambos") return "ida y vuelta";
+  return direction;
 }
