@@ -26,3 +26,18 @@
 - Se cambio el panel lateral del monitor a modo desplegable para que el mapa use todo el ancho.
 - Se agrego interpolacion visual del marcador entre reportes GPS para simular movimiento fluido sin alterar datos reales.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-08-11
+
+- Se preparo infraestructura de paradas por linea en el monitor web.
+- Nuevo modelo en `app/data/lineStops.ts`; por ahora `lineStops` queda vacio hasta cargar puntos reales.
+- Nuevas APIs:
+  - `/api/line-stops`
+  - `/api/public/line-stops`
+  - `/api/public/line-stops?lineId=49bis`
+- El mapa web ya puede dibujar paradas como puntos circulares cuando existan.
+- El panel lateral muestra `Paradas cercanas` y calcula distancia aproximada en linea recta desde el colectivo seleccionado.
+- Estado actual esperado: `Sin paradas cargadas para esta linea.`
+- Pendiente recomendado: crear modo edicion desde el monitor para agregar paradas haciendo clic en el mapa, seleccionando linea, nombre, sentido y orden; guardar en JSON o base de datos.
+- Commit/push realizado: `f9330ef Add line stops support to monitor` en `mgurzagasti-ai/monitor-santa-ana`.
+- Verificacion: `npm.cmd run build` termino correctamente.
