@@ -405,7 +405,7 @@
 }
 
 .linePicker {
-  min-height: 0;
+  flex: 0 0 auto;
   padding-top: 2px;
 }
 
@@ -520,7 +520,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  margin-top: auto;
+  flex: 0 0 auto;
 }
 
 .mapWrap {
