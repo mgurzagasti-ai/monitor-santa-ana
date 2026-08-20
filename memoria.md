@@ -61,3 +61,11 @@
 - `/api/public/line-stops` sigue siendo de lectura para la APK.
 - Se probo crear y borrar una parada temporal por API en `localhost:3002`; el archivo quedo nuevamente con `[]`.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-08-20 - Persistencia de paradas en produccion
+
+- Se corrigio el guardado de paradas en Vercel: `app/data/lineStops.ts` ahora usa Upstash Redis cuando `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` estan configuradas.
+- El JSON `app/data/lineStops.json` queda como respaldo local/desarrollo.
+- Si Redis esta configurado y Vercel rechaza escritura local con `EROFS`, el guardado no falla.
+- Si Redis no esta configurado en un servidor de solo lectura, la API devuelve un mensaje claro indicando que falta configurar Redis.
+- Verificacion: `npm.cmd run build` termino correctamente.
