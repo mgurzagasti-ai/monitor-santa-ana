@@ -37,6 +37,42 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const payload = (await request.json()) as { updates?: Array<{ id?: string; order?: unknown }> };
+    const updates = Array.isArray(payload.updates) ? payload.updates : [];
+    const orderById = new Map<string, number | undefined>();
+
+    for (const update of updates) {
+      const id = update.id?.trim();
+      if (!id) continue;
+      const order = update.order == null || Number(update.order) <= 0 ? undefined : Math.round(Number(update.order));
+      orderById.set(id, order);
+    }
+
+    if (orderById.size === 0) {
+      return NextResponse.json({ error: "No hay paradas para actualizar" }, { status: 400 });
+    }
+
+    const stops = await readLineStops();
+    const nextStops = stops
+      .map((stop) => (orderById.has(stop.id) ? { ...stop, order: orderById.get(stop.id) } : stop))
+      .sort(compareStops);
+    await writeLineStops(nextStops);
+
+    return NextResponse.json({
+      stops: enrichStops(nextStops),
+      total: nextStops.length,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "No se pudieron actualizar las paradas" },
+      { status: 400 }
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id")?.trim();
   if (!id) {

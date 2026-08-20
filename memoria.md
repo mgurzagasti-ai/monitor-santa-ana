@@ -69,3 +69,9 @@
 - Si Redis esta configurado y Vercel rechaza escritura local con `EROFS`, el guardado no falla.
 - Si Redis no esta configurado en un servidor de solo lectura, la API devuelve un mensaje claro indicando que falta configurar Redis.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-08-20 - Orden masivo de paradas
+
+- Se agrego `PATCH /api/line-stops` para actualizar el orden de paradas existentes en bloque.
+- Se preparo el orden de linea 15 usando las trazas `IDA LINEA 15` y `VUELTA LINEA 15` del KML publico.
+- Verificacion: `npm.cmd run build` termino correctamente.
