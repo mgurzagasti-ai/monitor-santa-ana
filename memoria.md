@@ -74,4 +74,5 @@
 
 - Se agrego `PATCH /api/line-stops` para actualizar el orden de paradas existentes en bloque.
 - Se preparo el orden de linea 15 usando las trazas `IDA LINEA 15` y `VUELTA LINEA 15` del KML publico.
+- Se protegio `/api/line-stops` con la misma autenticacion basica del monitor; `/api/public/line-stops` sigue abierto para la APK.
 - Verificacion: `npm.cmd run build` termino correctamente.

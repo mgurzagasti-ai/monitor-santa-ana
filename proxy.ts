@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const protectedPaths = ["/", "/api/fleet", "/api/assignments"];
+const protectedPaths = ["/", "/api/fleet", "/api/assignments", "/api/line-stops"];
 
 export function proxy(request: NextRequest) {
   const password = process.env.MONITOR_OPERATOR_PASSWORD;
@@ -28,5 +28,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/api/fleet/:path*", "/api/assignments/:path*"]
+  matcher: ["/", "/api/fleet/:path*", "/api/assignments/:path*", "/api/line-stops/:path*"]
 };
