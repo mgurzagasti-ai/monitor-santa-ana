@@ -1,12 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { readEnvFleetDevices, type FleetDevice } from "@/app/data/fleetDevices";
 
-export type FleetDevice = {
-  id: number;
-  line: string;
-  label: string;
-  color: string;
-};
 
 export type TraccarPosition = {
   deviceId: number;
@@ -24,6 +19,13 @@ export type TraccarPosition = {
   distance: number | null;
 };
 
+export type TraccarDevice = {
+  id: number;
+  name: string;
+  uniqueId: string;
+  status?: string;
+};
+
 type TraccarConfig = {
   baseUrl: string;
   email: string;
@@ -34,7 +36,7 @@ type TraccarConfig = {
 export function getConfig(): TraccarConfig {
   const props = readLocalProperties();
   const deviceId = Number(process.env.TRACCAR_DEVICE_ID ?? props["traccar.deviceId"] ?? 0);
-  const devices = parseFleetDevices(process.env.FLEET_DEVICES, deviceId);
+  const devices = readEnvFleetDevices(process.env.FLEET_DEVICES, deviceId);
 
   return {
     baseUrl: (process.env.TRACCAR_BASE_URL ?? props["traccar.baseUrl"] ?? "").replace(/\/$/, ""),
@@ -45,6 +47,39 @@ export function getConfig(): TraccarConfig {
 }
 
 export async function fetchPositions(path: string): Promise<TraccarPosition[]> {
+  const rows = await fetchTraccarJson<Array<Record<string, unknown>>>(path);
+  return rows
+    .map((row) => ({
+      deviceId: Number(row.deviceId),
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      speedKmh: Number(row.speed ?? 0) * 1.852,
+      course: readNullableNumber(row.course),
+      fixTime: String(row.fixTime ?? ""),
+      valid: row.valid !== false,
+      motion: readBooleanAttribute(row, "motion"),
+      ignition: readBooleanAttribute(row, "ignition"),
+      power: readNumberAttribute(row, "power"),
+      battery: readNumberAttribute(row, "battery"),
+      satellites: readNumberAttribute(row, "sat"),
+      distance: readNumberAttribute(row, "distance")
+    }))
+    .filter((position) => Number.isFinite(position.latitude) && Number.isFinite(position.longitude));
+}
+
+export async function fetchTraccarDevices(): Promise<TraccarDevice[]> {
+  const rows = await fetchTraccarJson<Array<Record<string, unknown>>>("/api/devices");
+  return rows
+    .map((row) => ({
+      id: Number(row.id),
+      name: String(row.name ?? ""),
+      uniqueId: String(row.uniqueId ?? ""),
+      status: typeof row.status === "string" ? row.status : undefined
+    }))
+    .filter((device) => Number.isFinite(device.id) && device.id > 0 && device.uniqueId);
+}
+
+async function fetchTraccarJson<T>(path: string): Promise<T> {
   const config = getConfig();
   if (!config.baseUrl || !config.email || !config.password) {
     throw new Error("Falta configurar Traccar");
@@ -63,24 +98,7 @@ export async function fetchPositions(path: string): Promise<TraccarPosition[]> {
     throw new Error(`Traccar HTTP ${response.status}: ${body.slice(0, 160)}`);
   }
 
-  const rows = JSON.parse(body) as Array<Record<string, unknown>>;
-  return rows
-    .map((row) => ({
-      deviceId: Number(row.deviceId),
-      latitude: Number(row.latitude),
-      longitude: Number(row.longitude),
-      speedKmh: Number(row.speed ?? 0) * 1.852,
-      course: readNullableNumber(row.course),
-      fixTime: String(row.fixTime ?? ""),
-      valid: row.valid !== false,
-      motion: readBooleanAttribute(row, "motion"),
-      ignition: readBooleanAttribute(row, "ignition"),
-      power: readNumberAttribute(row, "power"),
-      battery: readNumberAttribute(row, "battery"),
-      satellites: readNumberAttribute(row, "sat"),
-      distance: readNumberAttribute(row, "distance")
-    }))
-    .filter((position) => Number.isFinite(position.latitude) && Number.isFinite(position.longitude));
+  return JSON.parse(body) as T;
 }
 
 function readAttributes(row: Record<string, unknown>): Record<string, unknown> {
@@ -101,30 +119,6 @@ function readBooleanAttribute(row: Record<string, unknown>, name: string): boole
 function readNumberAttribute(row: Record<string, unknown>, name: string): number | null {
   const value = Number(readAttributes(row)[name]);
   return Number.isFinite(value) ? value : null;
-}
-
-function parseFleetDevices(value: string | undefined, fallbackId: number): FleetDevice[] {
-  const fallbackDevices = fallbackId
-    ? [
-        {
-          id: fallbackId,
-          line: "49 BIS",
-          label: "Santa Ana 49 BIS",
-          color: "#f57c00"
-        }
-      ]
-    : [];
-
-  if (value) {
-    try {
-      const devices = JSON.parse(value) as FleetDevice[];
-      return Array.isArray(devices) && devices.length > 0 ? devices : fallbackDevices;
-    } catch {
-      return fallbackDevices;
-    }
-  }
-
-  return fallbackDevices;
 }
 
 function readLocalProperties(): Record<string, string> {

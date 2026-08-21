@@ -71,6 +71,19 @@ type VehicleAssignment = {
   assignedLineId: string;
 };
 
+type TraccarDevice = {
+  id: number;
+  name: string;
+  uniqueId: string;
+  status?: string;
+};
+
+type DeviceDraft = {
+  deviceId: string;
+  internalNumber: string;
+  assignedLineId: string;
+};
+
 type StopDraft = {
   name: string;
   lineId: string;
@@ -85,6 +98,10 @@ export default function Home() {
   const [lineRoutes, setLineRoutes] = useState<LineRoute[]>([]);
   const [lineStops, setLineStops] = useState<LineStop[]>([]);
   const [assignments, setAssignments] = useState<VehicleAssignment[]>([]);
+  const [traccarDevices, setTraccarDevices] = useState<TraccarDevice[]>([]);
+  const [deviceManagerOpen, setDeviceManagerOpen] = useState(false);
+  const [deviceDraft, setDeviceDraft] = useState<DeviceDraft>({ deviceId: "", internalNumber: "", assignedLineId: "" });
+  const [deviceMessage, setDeviceMessage] = useState("");
   const [showLineRoutes, setShowLineRoutes] = useState(true);
   const [showLineStops, setShowLineStops] = useState(true);
   const [stopEditorOpen, setStopEditorOpen] = useState(false);
@@ -102,6 +119,7 @@ export default function Home() {
     longitude: null
   });
   const [savingAssignment, setSavingAssignment] = useState(false);
+  const [savingDevice, setSavingDevice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -262,21 +280,39 @@ export default function Home() {
 
     setSavingAssignment(true);
     try {
-      const response = await fetch("/api/assignments", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId: selectedVehicle.deviceId,
-          internalNumber,
-          label: `Colectivo ${internalNumber}`,
-          assignedLineId: nextLineId
-        })
-      });
+      const monitorDevices = readMonitorDevices();
+      const monitorDevice = monitorDevices.find((device) => device.deviceId === selectedVehicle.deviceId);
 
-      const data = (await response.json()) as { assignments?: VehicleAssignment[] };
-      if (data.assignments) {
-        setAssignments(data.assignments);
+      if (monitorDevice) {
+        const nextDevices = upsertMonitorDevice({
+          ...monitorDevice,
+          internalNumber,
+          assignedLineId: nextLineId
+        });
+        setAssignments(nextDevices.map((device) => ({
+          deviceId: device.deviceId,
+          internalNumber: device.internalNumber,
+          label: `Colectivo ${device.internalNumber}`,
+          assignedLineId: device.assignedLineId
+        })));
+      } else {
+        const response = await fetch("/api/assignments", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deviceId: selectedVehicle.deviceId,
+            internalNumber,
+            label: `Colectivo ${internalNumber}`,
+            assignedLineId: nextLineId
+          })
+        });
+
+        const data = (await response.json()) as { assignments?: VehicleAssignment[] };
+        if (data.assignments) {
+          setAssignments(data.assignments);
+        }
       }
+
       await loadFleet();
     } finally {
       setSavingAssignment(false);
@@ -286,7 +322,11 @@ export default function Home() {
   async function loadFleet() {
     setLoading(true);
     try {
-      const response = await fetch("/api/fleet", { cache: "no-store" });
+      const monitorDevices = readMonitorDevices();
+      const url = monitorDevices.length > 0
+        ? `/api/monitor-fleet?devices=${encodeURIComponent(JSON.stringify(monitorDevices))}`
+        : "/api/fleet";
+      const response = await fetch(url, { cache: "no-store" });
       const data = (await response.json()) as FleetResponse;
       setFleet(data);
       if (!selectedDeviceId && data.vehicles[0]) {
@@ -310,9 +350,74 @@ export default function Home() {
   }
 
   async function loadAssignments() {
+    const localAssignments = readMonitorDevices().map((device) => ({
+      deviceId: device.deviceId,
+      internalNumber: device.internalNumber,
+      label: `Colectivo ${device.internalNumber}`,
+      assignedLineId: device.assignedLineId
+    }));
+    if (localAssignments.length > 0) {
+      setAssignments(localAssignments);
+      return;
+    }
+
     const response = await fetch("/api/assignments", { cache: "no-store" });
     const data = (await response.json()) as { assignments: VehicleAssignment[] };
     setAssignments(data.assignments ?? []);
+  }
+
+  async function loadTraccarDevices() {
+    const response = await fetch("/api/devices", { cache: "no-store" });
+    const data = (await response.json()) as { devices?: TraccarDevice[]; error?: string };
+    setTraccarDevices(data.devices ?? []);
+    if (data.error) setDeviceMessage(data.error);
+  }
+
+  function openDeviceManager() {
+    const assignedLineId = selectedVehicle?.assignedLineId || selectedLineRouteIds[0] || lineRoutesWithPaths[0]?.id || "";
+    setDeviceDraft((current) => ({ ...current, assignedLineId: current.assignedLineId || assignedLineId }));
+    setDeviceManagerOpen(true);
+    setDeviceMessage("Selecciona un GPS de Traccar, carga el interno y asigna la linea.");
+    loadTraccarDevices();
+  }
+
+  function closeDeviceManager() {
+    setDeviceManagerOpen(false);
+    setDeviceMessage("");
+  }
+
+  async function saveMonitorDevice() {
+    const traccarDevice = traccarDevices.find((device) => String(device.id) === deviceDraft.deviceId);
+    const internalNumber = deviceDraft.internalNumber.trim();
+    const assignedLineId = deviceDraft.assignedLineId;
+
+    if (!traccarDevice || !internalNumber || !assignedLineId) {
+      setDeviceMessage("Falta GPS, interno o linea.");
+      return;
+    }
+
+    setSavingDevice(true);
+    try {
+      const nextDevice = {
+        deviceId: traccarDevice.id,
+        uniqueId: traccarDevice.uniqueId,
+        name: traccarDevice.name,
+        internalNumber,
+        assignedLineId
+      };
+      const nextDevices = upsertMonitorDevice(nextDevice);
+      setAssignments(nextDevices.map((device) => ({
+        deviceId: device.deviceId,
+        internalNumber: device.internalNumber,
+        label: `Colectivo ${device.internalNumber}`,
+        assignedLineId: device.assignedLineId
+      })));
+      setSelectedDeviceId(traccarDevice.id);
+      setDeviceMessage("GPS cargado en este monitor.");
+      await loadFleet();
+    } finally {
+      setSavingDevice(false);
+    }
   }
 
   useEffect(() => {
@@ -320,6 +425,7 @@ export default function Home() {
     loadLineRoutes();
     loadLineStops();
     loadAssignments();
+    loadTraccarDevices();
     const timer = window.setInterval(loadFleet, 15000);
     return () => window.clearInterval(timer);
   }, []);
@@ -363,8 +469,8 @@ export default function Home() {
             <button className={styles.iconButton} onClick={loadFleet} title="Actualizar">
               <RefreshCcw size={18} className={loading ? styles.spin : undefined} />
             </button>
-            <button className={styles.iconButton} onClick={stopEditorOpen ? closeStopEditor : openStopEditor} title="Editar paradas">
-              {stopEditorOpen ? <X size={18} /> : <Plus size={18} />}
+            <button className={styles.iconButton} onClick={deviceManagerOpen ? closeDeviceManager : openDeviceManager} title="Cargar GPS">
+              {deviceManagerOpen ? <X size={18} /> : <Plus size={18} />}
             </button>
             <button className={styles.iconButton} onClick={() => setSidebarOpen(false)} title="Cerrar monitor">
               <PanelLeftClose size={18} />
@@ -411,6 +517,56 @@ export default function Home() {
             </button>
           ))}
         </section>
+
+        {deviceManagerOpen ? (
+          <section className={styles.assignmentPanel}>
+            <div className={styles.sectionHeader}>
+              <span>Cargar GPS</span>
+              <small>{savingDevice ? "Guardando" : "Traccar"}</small>
+            </div>
+            <label className={styles.field}>
+              <span>GPS</span>
+              <select
+                value={deviceDraft.deviceId}
+                onChange={(event) => setDeviceDraft((current) => ({ ...current, deviceId: event.target.value }))}
+              >
+                <option value="">Seleccionar GPS</option>
+                {traccarDevices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name} - {device.uniqueId}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>Interno</span>
+              <input
+                value={deviceDraft.internalNumber}
+                onChange={(event) => setDeviceDraft((current) => ({ ...current, internalNumber: event.target.value }))}
+                placeholder="705"
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Linea</span>
+              <select
+                value={deviceDraft.assignedLineId}
+                onChange={(event) => setDeviceDraft((current) => ({ ...current, assignedLineId: event.target.value }))}
+              >
+                <option value="">Seleccionar linea</option>
+                {lineRoutesWithPaths.map((line) => (
+                  <option key={line.id} value={line.id}>
+                    {line.number} - {line.name.replace(/^Linea\s+/i, "")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className={styles.primaryButton} onClick={saveMonitorDevice} disabled={savingDevice}>
+              <Save size={17} />
+              <span>Guardar GPS</span>
+            </button>
+            {deviceMessage ? <p className={styles.editorHint}>{deviceMessage}</p> : null}
+          </section>
+        ) : null}
 
         {selectedVehicle ? (
           <section className={styles.assignmentPanel}>
@@ -602,6 +758,35 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+function readMonitorDevices(): Array<{ deviceId: number; uniqueId?: string; name?: string; internalNumber: string; assignedLineId: string }> {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const rows = JSON.parse(window.localStorage.getItem("santaAnaMonitorDevices") ?? "[]") as Array<{
+      deviceId: number;
+      uniqueId?: string;
+      name?: string;
+      internalNumber: string;
+      assignedLineId: string;
+    }>;
+    return Array.isArray(rows) ? rows.filter((row) => Number.isFinite(Number(row.deviceId)) && row.internalNumber && row.assignedLineId) : [];
+  } catch {
+    return [];
+  }
+}
+
+function upsertMonitorDevice(next: { deviceId: number; uniqueId?: string; name?: string; internalNumber: string; assignedLineId: string }) {
+  const devices = readMonitorDevices();
+  const index = devices.findIndex((device) => device.deviceId === next.deviceId);
+  if (index >= 0) {
+    devices[index] = next;
+  } else {
+    devices.push(next);
+  }
+  window.localStorage.setItem("santaAnaMonitorDevices", JSON.stringify(devices));
+  return devices;
 }
 
 function routeSelectionLabel(selectedCount: number) {
