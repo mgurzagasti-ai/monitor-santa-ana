@@ -1,4 +1,5 @@
 import { readAssignments } from "@/app/data/assignments";
+import { readFleetDevices } from "@/app/data/fleetDevices";
 import { lineRoutes } from "@/app/data/lineRoutes";
 import { isRedisConfigured, redisCommand } from "@/app/data/redis";
 import { fetchPositions, getConfig, type TraccarPosition } from "@/app/api/traccar";
@@ -54,10 +55,11 @@ export async function invalidateFleetCache() {
 async function buildFleetSnapshot(): Promise<FleetSnapshot> {
   const config = getConfig();
   const assignments = await readAssignments();
+  const devices = await readFleetDevices(config.devices);
   const positions = await fetchPositions("/api/positions").catch(() => []);
   const vehicles = (
     await Promise.all(
-      config.devices.map(async (device) => {
+      devices.map(async (device) => {
         const position = latestPositionForDevice(positions, device.id) ?? (await fetchLatestPosition(device.id).catch(() => null));
         if (!position) return null;
         const assignment = assignments.find((row) => row.deviceId === device.id);

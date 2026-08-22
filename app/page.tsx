@@ -284,11 +284,20 @@ export default function Home() {
       const monitorDevice = monitorDevices.find((device) => device.deviceId === selectedVehicle.deviceId);
 
       if (monitorDevice) {
-        const nextDevices = upsertMonitorDevice({
+        const nextMonitorDevice = {
           ...monitorDevice,
           internalNumber,
           assignedLineId: nextLineId
+        };
+        const response = await fetch("/api/devices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nextMonitorDevice)
         });
+        const data = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el GPS");
+
+        const nextDevices = upsertMonitorDevice(nextMonitorDevice);
         setAssignments(nextDevices.map((device) => ({
           deviceId: device.deviceId,
           internalNumber: device.internalNumber,
@@ -405,6 +414,14 @@ export default function Home() {
         internalNumber,
         assignedLineId
       };
+      const response = await fetch("/api/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextDevice)
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el GPS");
+
       const nextDevices = upsertMonitorDevice(nextDevice);
       setAssignments(nextDevices.map((device) => ({
         deviceId: device.deviceId,
@@ -413,7 +430,7 @@ export default function Home() {
         assignedLineId: device.assignedLineId
       })));
       setSelectedDeviceId(traccarDevice.id);
-      setDeviceMessage("GPS cargado en este monitor.");
+      setDeviceMessage("GPS cargado para el monitor y la APK.");
       await loadFleet();
     } finally {
       setSavingDevice(false);
