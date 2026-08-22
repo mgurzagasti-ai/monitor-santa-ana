@@ -463,7 +463,7 @@ export default function Home() {
     loadLineStops();
     loadAssignments();
     loadTraccarDevices();
-    const timer = window.setInterval(loadFleet, 15000);
+    const timer = window.setInterval(loadFleet, 30000);
     return () => window.clearInterval(timer);
   }, []);
 
