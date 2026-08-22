@@ -54,11 +54,11 @@ export async function invalidateFleetCache() {
 async function buildFleetSnapshot(): Promise<FleetSnapshot> {
   const config = getConfig();
   const assignments = await readAssignments();
-  const positions = await fetchPositions("/api/positions");
+  const positions = await fetchPositions("/api/positions").catch(() => []);
   const vehicles = (
     await Promise.all(
       config.devices.map(async (device) => {
-        const position = latestPositionForDevice(positions, device.id) ?? (await fetchLatestPosition(device.id));
+        const position = latestPositionForDevice(positions, device.id) ?? (await fetchLatestPosition(device.id).catch(() => null));
         if (!position) return null;
         const assignment = assignments.find((row) => row.deviceId === device.id);
         const assignedLine = lineRoutes.find((line) => line.id === assignment?.assignedLineId);
