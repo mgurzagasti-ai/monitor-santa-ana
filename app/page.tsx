@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, PanelLeftClose, PanelLeftOpen, Plus, Power, RefreshCcw, Save, Satellite, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 
 const FleetMap = dynamic(() => import("./ui/FleetMap"), { ssr: false });
@@ -101,6 +101,7 @@ export default function Home() {
   const [traccarDevices, setTraccarDevices] = useState<TraccarDevice[]>([]);
   const [deviceManagerOpen, setDeviceManagerOpen] = useState(false);
   const [deviceDraft, setDeviceDraft] = useState<DeviceDraft>({ deviceId: "", internalNumber: "", assignedLineId: "" });
+  const syncedMonitorDevicesRef = useRef("");
   const [deviceMessage, setDeviceMessage] = useState("");
   const [showLineRoutes, setShowLineRoutes] = useState(true);
   const [showLineStops, setShowLineStops] = useState(true);
@@ -328,10 +329,29 @@ export default function Home() {
     }
   }
 
+  async function syncMonitorDevices(monitorDevices: ReturnType<typeof readMonitorDevices>) {
+    if (monitorDevices.length === 0) return;
+
+    const syncKey = JSON.stringify(monitorDevices.map((device) => ({
+      deviceId: device.deviceId,
+      internalNumber: device.internalNumber,
+      assignedLineId: device.assignedLineId
+    })));
+    if (syncedMonitorDevicesRef.current === syncKey) return;
+
+    await Promise.all(monitorDevices.map((device) => fetch("/api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(device)
+    })));
+    syncedMonitorDevicesRef.current = syncKey;
+  }
+
   async function loadFleet() {
     setLoading(true);
     try {
       const monitorDevices = readMonitorDevices();
+      await syncMonitorDevices(monitorDevices).catch(() => null);
       const url = monitorDevices.length > 0
         ? `/api/monitor-fleet?devices=${encodeURIComponent(JSON.stringify(monitorDevices))}`
         : "/api/fleet";
