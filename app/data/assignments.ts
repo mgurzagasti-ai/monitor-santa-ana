@@ -45,7 +45,11 @@ function readLocalAssignments(): VehicleAssignment[] {
 }
 
 function writeLocalAssignments(assignments: VehicleAssignment[]) {
-  writeFileSync(assignmentsFile, `${JSON.stringify(assignments, null, 2)}\n`, "utf8");
+  try {
+    writeFileSync(assignmentsFile, `${JSON.stringify(assignments, null, 2)}\n`, "utf8");
+  } catch {
+    // Vercel functions run on a read-only filesystem; Redis remains the source of truth there.
+  }
 }
 
 async function readRedisAssignments(): Promise<VehicleAssignment[] | null> {

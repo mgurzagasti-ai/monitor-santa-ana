@@ -75,7 +75,11 @@ function readLocalFleetDevices(): FleetDevice[] {
 }
 
 function writeLocalFleetDevices(devices: FleetDevice[]) {
-  writeFileSync(fleetDevicesFile, `${JSON.stringify(devices, null, 2)}\n`, "utf8");
+  try {
+    writeFileSync(fleetDevicesFile, `${JSON.stringify(devices, null, 2)}\n`, "utf8");
+  } catch {
+    // Vercel functions run on a read-only filesystem; Redis remains the source of truth there.
+  }
 }
 
 async function readRedisFleetDevices(): Promise<FleetDevice[] | null> {
