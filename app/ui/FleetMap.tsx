@@ -332,35 +332,70 @@ function DraftStopMarker({ stop }: { stop: DraftStop }) {
 
 function useVehicleIcon(vehicle: FleetVehicle) {
   return useMemo(() => {
-    const label = vehicle.internalNumber?.trim() || vehicle.line;
+    const label = escapeHtml(vehicle.internalNumber?.trim() || vehicle.line);
+    const course = Number(vehicle.course);
+    const hasCourse = Number.isFinite(course);
+    const rotation = hasCourse ? course - 90 : 0;
 
     return L.divIcon({
       className: "",
       html: `<div style="
-        width:62px;height:40px;
+        width:74px;height:54px;
         position:relative;
       ">
         <div style="
           position:absolute;left:4px;top:7px;
-          width:54px;height:24px;border-radius:7px 9px 6px 6px;
-          background:#facc15;
-          border:2px solid #ffffff;
-          box-shadow:0 4px 12px rgba(0,0,0,.3);
+          width:66px;height:40px;
+          transform:rotate(${rotation}deg);
+          transform-origin:center;
+          transition:transform .25s ease;
         ">
           <div style="
-            position:absolute;inset:0;
-            display:grid;place-items:center;
-            color:#111827;
-            font:900 13px Arial,sans-serif;
-          ">${label}</div>
+            position:absolute;right:-6px;top:11px;
+            width:0;height:0;
+            border-top:9px solid transparent;
+            border-bottom:9px solid transparent;
+            border-left:14px solid #111827;
+            filter:drop-shadow(0 2px 4px rgba(0,0,0,.28));
+          "></div>
+          <div style="
+            position:absolute;left:4px;top:8px;
+            width:54px;height:24px;border-radius:7px 9px 6px 6px;
+            background:#facc15;
+            border:2px solid #ffffff;
+            box-shadow:0 4px 12px rgba(0,0,0,.3);
+          ">
+            <div style="
+              position:absolute;inset:0;
+              display:grid;place-items:center;
+              color:#111827;
+              font:900 13px Arial,sans-serif;
+              transform:rotate(${-rotation}deg);
+              transform-origin:center;
+            ">${label}</div>
+          </div>
+          <div style="position:absolute;left:12px;bottom:7px;width:10px;height:10px;border-radius:50%;background:#111827;border:2px solid #f8fafc;"></div>
+          <div style="position:absolute;right:12px;bottom:7px;width:10px;height:10px;border-radius:50%;background:#111827;border:2px solid #f8fafc;"></div>
+          <div style="
+            position:absolute;right:1px;top:16px;
+            width:8px;height:8px;border-radius:999px;
+            background:#ffffff;border:2px solid #111827;
+          "></div>
         </div>
-        <div style="position:absolute;left:12px;bottom:4px;width:10px;height:10px;border-radius:50%;background:#111827;border:2px solid #f8fafc;"></div>
-        <div style="position:absolute;right:12px;bottom:4px;width:10px;height:10px;border-radius:50%;background:#111827;border:2px solid #f8fafc;"></div>
       </div>`,
-      iconSize: [62, 40],
-      iconAnchor: [31, 20]
+      iconSize: [74, 54],
+      iconAnchor: [37, 27]
     });
-  }, [vehicle.internalNumber, vehicle.line]);
+  }, [vehicle.course, vehicle.internalNumber, vehicle.line]);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function formatDirection(direction: LineStop["direction"]) {
