@@ -791,6 +791,7 @@ export default function Home() {
           stopEditorEnabled={stopEditorOpen}
           draftStop={draftStopMarker}
           onMapClick={handleStopMapClick}
+          onVehicleSelect={setSelectedDeviceId}
         />
       </section>
     </main>

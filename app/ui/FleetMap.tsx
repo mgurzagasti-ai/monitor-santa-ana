@@ -54,7 +54,8 @@ export default function FleetMap({
   lineStops,
   stopEditorEnabled,
   draftStop,
-  onMapClick
+  onMapClick,
+  onVehicleSelect
 }: {
   vehicles: FleetVehicle[];
   selectedDeviceId: number | null;
@@ -63,10 +64,12 @@ export default function FleetMap({
   stopEditorEnabled: boolean;
   draftStop: DraftStop | null;
   onMapClick: (point: { latitude: number; longitude: number }) => void;
+  onVehicleSelect: (deviceId: number) => void;
 }) {
   const mapRef = useRef<L.Map | null>(null);
   const animatedVehicles = useAnimatedVehicles(vehicles);
-  const selected = animatedVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? animatedVehicles[0];
+  const selected = vehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? vehicles[0];
+  const selectedFollowKey = selected?.deviceId ?? null;
   const center: [number, number] = selected ? [selected.latitude, selected.longitude] : [-24.1858, -65.2995];
 
   useEffect(() => {
@@ -86,7 +89,7 @@ export default function FleetMap({
     >
       <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <MapSizeWatcher />
-      <FollowPoint center={center} />
+      <FollowPoint center={center} followKey={selectedFollowKey} />
       <StopClickHandler enabled={stopEditorEnabled} onMapClick={onMapClick} />
       {lineRoutes.flatMap((line) =>
         line.paths.map((path, index) => (
@@ -106,7 +109,7 @@ export default function FleetMap({
       ))}
       {draftStop ? <DraftStopMarker stop={draftStop} /> : null}
       {animatedVehicles.map((vehicle) => (
-        <VehicleMarker key={vehicle.deviceId} vehicle={vehicle} />
+        <VehicleMarker key={vehicle.deviceId} vehicle={vehicle} onSelect={onVehicleSelect} />
       ))}
     </MapContainer>
   );
@@ -230,12 +233,49 @@ function MapSizeWatcher() {
   return null;
 }
 
-function FollowPoint({ center }: { center: [number, number] }) {
+function FollowPoint({ center, followKey }: { center: [number, number]; followKey: number | null }) {
   const map = useMap();
+  const isUserInteractingRef = useRef(false);
+  const resumeTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
+    const pauseFollow = () => {
+      isUserInteractingRef.current = true;
+      if (resumeTimerRef.current) {
+        window.clearTimeout(resumeTimerRef.current);
+      }
+    };
+    const resumeFollowSoon = () => {
+      if (resumeTimerRef.current) {
+        window.clearTimeout(resumeTimerRef.current);
+      }
+      resumeTimerRef.current = window.setTimeout(() => {
+        isUserInteractingRef.current = false;
+      }, 2500);
+    };
+
+    map.on("dragstart", pauseFollow);
+    map.on("zoomstart", pauseFollow);
+    map.on("dragend", resumeFollowSoon);
+    map.on("zoomend", resumeFollowSoon);
+
+    return () => {
+      if (resumeTimerRef.current) {
+        window.clearTimeout(resumeTimerRef.current);
+      }
+      map.off("dragstart", pauseFollow);
+      map.off("zoomstart", pauseFollow);
+      map.off("dragend", resumeFollowSoon);
+      map.off("zoomend", resumeFollowSoon);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (isUserInteractingRef.current) return;
     map.invalidateSize({ animate: false });
-    map.setView(center, map.getZoom(), { animate: true });
-  }, [center[0], center[1], map]);
+    map.setView(center, map.getZoom(), { animate: false });
+  }, [center[0], center[1], followKey, map]);
+
   return null;
 }
 
@@ -328,11 +368,17 @@ function formatDirection(direction: LineStop["direction"]) {
   return direction;
 }
 
-function VehicleMarker({ vehicle }: { vehicle: FleetVehicle }) {
+function VehicleMarker({ vehicle, onSelect }: { vehicle: FleetVehicle; onSelect: (deviceId: number) => void }) {
   const icon = useVehicleIcon(vehicle);
 
   return (
-    <Marker position={[vehicle.latitude, vehicle.longitude]} icon={icon}>
+    <Marker
+      position={[vehicle.latitude, vehicle.longitude]}
+      icon={icon}
+      eventHandlers={{
+        click: () => onSelect(vehicle.deviceId)
+      }}
+    >
       <Popup>
         <strong>{vehicle.label}</strong>
         <br />
