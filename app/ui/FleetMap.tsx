@@ -333,60 +333,43 @@ function DraftStopMarker({ stop }: { stop: DraftStop }) {
 function useVehicleIcon(vehicle: FleetVehicle) {
   return useMemo(() => {
     const label = escapeHtml(vehicle.internalNumber?.trim() || vehicle.line);
+    const markerColor = escapeHtml(vehicle.color || "#facc15");
     const course = Number(vehicle.course);
-    const hasCourse = Number.isFinite(course);
-    const rotation = hasCourse ? course - 90 : 0;
+    const rotation = Number.isFinite(course) ? course : 0;
 
     return L.divIcon({
       className: "",
       html: `<div style="
-        width:74px;height:54px;
+        width:58px;height:58px;
         position:relative;
       ">
         <div style="
-          position:absolute;left:4px;top:7px;
-          width:66px;height:40px;
-          transform:rotate(${rotation}deg);
-          transform-origin:center;
-          transition:transform .25s ease;
-        ">
-          <div style="
-            position:absolute;right:-6px;top:11px;
-            width:0;height:0;
-            border-top:9px solid transparent;
-            border-bottom:9px solid transparent;
-            border-left:14px solid #111827;
-            filter:drop-shadow(0 2px 4px rgba(0,0,0,.28));
-          "></div>
-          <div style="
-            position:absolute;left:4px;top:8px;
-            width:54px;height:24px;border-radius:7px 9px 6px 6px;
-            background:#facc15;
-            border:2px solid #ffffff;
-            box-shadow:0 4px 12px rgba(0,0,0,.3);
-          ">
-            <div style="
-              position:absolute;inset:0;
-              display:grid;place-items:center;
-              color:#111827;
-              font:900 13px Arial,sans-serif;
-              transform:rotate(${-rotation}deg);
-              transform-origin:center;
-            ">${label}</div>
-          </div>
-          <div style="position:absolute;left:12px;bottom:7px;width:10px;height:10px;border-radius:50%;background:#111827;border:2px solid #f8fafc;"></div>
-          <div style="position:absolute;right:12px;bottom:7px;width:10px;height:10px;border-radius:50%;background:#111827;border:2px solid #f8fafc;"></div>
-          <div style="
-            position:absolute;right:1px;top:16px;
-            width:8px;height:8px;border-radius:999px;
-            background:#ffffff;border:2px solid #111827;
-          "></div>
-        </div>
+          position:absolute;left:50%;top:50%;
+          width:0;height:0;
+          border-left:8px solid transparent;
+          border-right:8px solid transparent;
+          border-bottom:18px solid #111827;
+          transform:translate(-50%, -50%) rotate(${rotation}deg) translateY(-27px);
+          transform-origin:center 27px;
+          filter:drop-shadow(0 2px 3px rgba(0,0,0,.28));
+        "></div>
+        <div style="
+          position:absolute;inset:5px;
+          display:grid;place-items:center;
+          border-radius:999px;
+          background:${markerColor};
+          border:4px solid #ffffff;
+          color:#111827;
+          font:900 13px Arial,sans-serif;
+          box-shadow:0 4px 12px rgba(0,0,0,.32);
+          text-align:center;
+          line-height:1;
+        ">${label}</div>
       </div>`,
-      iconSize: [74, 54],
-      iconAnchor: [37, 27]
+      iconSize: [58, 58],
+      iconAnchor: [29, 29]
     });
-  }, [vehicle.course, vehicle.internalNumber, vehicle.line]);
+  }, [vehicle.color, vehicle.course, vehicle.internalNumber, vehicle.line]);
 }
 
 function escapeHtml(value: string) {
