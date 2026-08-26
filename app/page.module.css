@@ -437,6 +437,19 @@
   text-transform: none;
 }
 
+.editorHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editorHeaderActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+}
+
 .field {
   display: grid;
   gap: 6px;

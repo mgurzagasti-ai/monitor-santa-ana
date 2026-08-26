@@ -688,7 +688,13 @@ export default function Home() {
           <section className={styles.stopEditorPanel}>
             <div className={styles.sectionHeader}>
               <span>Editor de paradas</span>
-              <small>{savingStop ? "Guardando" : selectedStopLine?.number ?? "Linea"}</small>
+              <div className={styles.editorHeaderActions}>
+                <small>{savingStop ? "Guardando" : selectedStopLine?.number ?? "Linea"}</small>
+                <button type="button" onClick={closeStopEditor} title="Cerrar editor">
+                  <X size={14} />
+                  <span>Cerrar</span>
+                </button>
+              </div>
             </div>
             <label className={styles.field}>
               <span>Linea</span>
