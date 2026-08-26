@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 
 const FleetMap = dynamic(() => import("./ui/FleetMap"), { ssr: false });
+const selectedDeviceStorageKey = "santaAnaSelectedDeviceId";
 
 type FleetVehicle = {
   deviceId: number;
@@ -181,6 +182,11 @@ export default function Home() {
       color: selectedStopLine.color
     };
   }, [selectedStopLine, stopDraft.latitude, stopDraft.longitude, stopEditorOpen]);
+
+  function selectVehicle(deviceId: number | null) {
+    setSelectedDeviceId(deviceId);
+    saveSelectedDeviceId(deviceId);
+  }
 
   function toggleLineRoute(lineId: string) {
     setSelectedLineRouteIds((current) =>
@@ -364,9 +370,18 @@ export default function Home() {
       const response = await fetch(url, { cache: "no-store" });
       const data = (await response.json()) as FleetResponse;
       setFleet(data);
-      if (!selectedDeviceId && data.vehicles[0]) {
-        setSelectedDeviceId(data.vehicles[0].deviceId);
-      }
+      setSelectedDeviceId((currentDeviceId) => {
+        const storedDeviceId = readSelectedDeviceId();
+        const preferredDeviceId = currentDeviceId ?? storedDeviceId;
+        if (preferredDeviceId && data.vehicles.some((vehicle) => vehicle.deviceId === preferredDeviceId)) {
+          saveSelectedDeviceId(preferredDeviceId);
+          return preferredDeviceId;
+        }
+
+        const fallbackDeviceId = data.vehicles[0]?.deviceId ?? null;
+        saveSelectedDeviceId(fallbackDeviceId);
+        return fallbackDeviceId;
+      });
     } finally {
       setLoading(false);
     }
@@ -455,7 +470,7 @@ export default function Home() {
         label: `Colectivo ${device.internalNumber}`,
         assignedLineId: device.assignedLineId
       })));
-      setSelectedDeviceId(traccarDevice.id);
+      selectVehicle(traccarDevice.id);
       setDeviceMessage("GPS cargado para el monitor y la APK.");
       await loadFleet();
     } finally {
@@ -464,6 +479,10 @@ export default function Home() {
   }
 
   useEffect(() => {
+    const storedDeviceId = readSelectedDeviceId();
+    if (storedDeviceId) {
+      setSelectedDeviceId(storedDeviceId);
+    }
     loadFleet();
     loadLineRoutes();
     loadLineStops();
@@ -547,7 +566,7 @@ export default function Home() {
             <button
               key={vehicle.deviceId}
               className={`${styles.vehicle} ${selectedVehicle?.deviceId === vehicle.deviceId ? styles.selected : ""}`}
-              onClick={() => setSelectedDeviceId(vehicle.deviceId)}
+              onClick={() => selectVehicle(vehicle.deviceId)}
             >
               <span className={styles.badge} style={{ background: vehicle.color }}>
                 {vehicle.line}
@@ -803,11 +822,28 @@ export default function Home() {
           stopEditorEnabled={stopEditorOpen}
           draftStop={draftStopMarker}
           onMapClick={handleStopMapClick}
-          onVehicleSelect={setSelectedDeviceId}
+          onVehicleSelect={selectVehicle}
         />
       </section>
     </main>
   );
+}
+
+function readSelectedDeviceId() {
+  if (typeof window === "undefined") return null;
+
+  const value = Number(window.localStorage.getItem(selectedDeviceStorageKey));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function saveSelectedDeviceId(deviceId: number | null) {
+  if (typeof window === "undefined") return;
+
+  if (deviceId) {
+    window.localStorage.setItem(selectedDeviceStorageKey, String(deviceId));
+  } else {
+    window.localStorage.removeItem(selectedDeviceStorageKey);
+  }
 }
 
 function readMonitorDevices(): Array<{ deviceId: number; uniqueId?: string; name?: string; internalNumber: string; assignedLineId: string }> {
