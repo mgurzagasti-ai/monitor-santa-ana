@@ -333,7 +333,7 @@ function DraftStopMarker({ stop }: { stop: DraftStop }) {
 function useVehicleIcon(vehicle: FleetVehicle) {
   return useMemo(() => {
     const label = escapeHtml(vehicle.internalNumber?.trim() || vehicle.line);
-    const markerColor = escapeHtml(vehicle.color || "#facc15");
+    const markerColor = "#facc15";
     const course = Number(vehicle.course);
     const rotation = Number.isFinite(course) ? course : 0;
 
@@ -369,7 +369,7 @@ function useVehicleIcon(vehicle: FleetVehicle) {
       iconSize: [58, 58],
       iconAnchor: [29, 29]
     });
-  }, [vehicle.color, vehicle.course, vehicle.internalNumber, vehicle.line]);
+  }, [vehicle.course, vehicle.internalNumber, vehicle.line]);
 }
 
 function escapeHtml(value: string) {
