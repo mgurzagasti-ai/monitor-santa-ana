@@ -65,6 +65,6 @@ export const lineRoutes = [
   routeLine("44", "44", "Linea 44", "1HU4uAV3p9dih3ZOUg7rrffvJ4Cqkzlk", "#92400E"),
   routeLine("45", "45", "Linea 45", "1_EI1eD8M67_xu5bvyezHpAYzSPVBeOc", "#A16207"),
   routeLine("46", "46", "Linea 46", "1tZ6WpUrBfBDynuGwZVN8UC3sSqZ93_8", "#4D7C0F"),
-  routeLine("49bis", "49 BIS", "Santa Ana - 72 Viv - H. Ninos", "1sw3akcsapXPBGsqGWWytY4OO74ZrEOg", "#F57C00"),
+  routeLine("49bis", "49", "", "1sw3akcsapXPBGsqGWWytY4OO74ZrEOg", "#F57C00"),
   routeLine("52", "52", "Linea 52", "1sk4PSH6jICp7xZQ_Yh8znBLBiginqzQ", "#15803D")
 ] satisfies LineRouteDefinition[];

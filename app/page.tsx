@@ -188,6 +188,12 @@ export default function Home() {
     );
   }
 
+  function editLineRoute(lineId: string) {
+    setStopEditorOpen(true);
+    setStopMessage("Hace clic en el mapa para ubicar la parada.");
+    updateStopLine(lineId);
+  }
+
   function updateStopLine(lineId: string) {
     setStopDraft((current) => ({ ...current, lineId }));
     setShowLineRoutes(true);
@@ -592,7 +598,7 @@ export default function Home() {
                 <option value="">Seleccionar linea</option>
                 {lineRoutesWithPaths.map((line) => (
                   <option key={line.id} value={line.id}>
-                    {line.number} - {line.name.replace(/^Linea\s+/i, "")}
+                    {formatLineLabel(line)}
                   </option>
                 ))}
               </select>
@@ -628,7 +634,7 @@ export default function Home() {
               >
                 {lineRoutesWithPaths.map((line) => (
                   <option key={line.id} value={line.id}>
-                    {line.number} - {line.name.replace(/^Linea\s+/i, "")}
+                    {formatLineLabel(line)}
                   </option>
                 ))}
               </select>
@@ -689,7 +695,7 @@ export default function Home() {
               <select value={stopDraft.lineId} onChange={(event) => updateStopLine(event.target.value)}>
                 {lineRoutesWithPaths.map((line) => (
                   <option key={line.id} value={line.id}>
-                    {line.number} - {line.name.replace(/^Linea\s+/i, "")}
+                    {formatLineLabel(line)}
                   </option>
                 ))}
               </select>
@@ -764,12 +770,12 @@ export default function Home() {
                 <button
                   key={line.id}
                   className={`${styles.lineChip} ${isSelected ? styles.lineChipSelected : ""} ${isMuted ? styles.lineChipMuted : ""}`}
-                  onClick={() => toggleLineRoute(line.id)}
-                  title={line.name}
+                  onClick={() => editLineRoute(line.id)}
+                  title={`Editar ${formatLineLabel(line)}`}
                 >
                   <span style={{ background: line.color }} />
                   <strong>{line.number}</strong>
-                  <small>{line.name.replace(/^Linea\s+/i, "")}</small>
+                  <small>{formatLineDescription(line)}</small>
                 </button>
               );
             })}
@@ -831,6 +837,16 @@ function routeSelectionLabel(selectedCount: number) {
   if (selectedCount === 0) return "Todas";
   if (selectedCount === 1) return "1 selec.";
   return `${selectedCount} selec.`;
+}
+
+function formatLineDescription(line: Pick<LineRoute, "name" | "number">) {
+  const description = line.name.replace(/^Linea\s+/i, "").trim();
+  return description && description !== line.number ? description : line.number;
+}
+
+function formatLineLabel(line: Pick<LineRoute, "name" | "number">) {
+  const description = formatLineDescription(line);
+  return description === line.number ? line.number : `${line.number} - ${description}`;
 }
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
