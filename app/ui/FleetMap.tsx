@@ -67,7 +67,6 @@ export default function FleetMap({
   onVehicleSelect: (deviceId: number) => void;
 }) {
   const mapRef = useRef<L.Map | null>(null);
-  const animatedVehicles = useAnimatedVehicles(vehicles);
   const selected = vehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? vehicles[0];
   const selectedFollowKey = selected?.deviceId ?? null;
   const center: [number, number] = selected ? [selected.latitude, selected.longitude] : [-24.1858, -65.2995];
@@ -108,7 +107,7 @@ export default function FleetMap({
         <StopMarker key={stop.id} stop={stop} />
       ))}
       {draftStop ? <DraftStopMarker stop={draftStop} /> : null}
-      {animatedVehicles.map((vehicle) => (
+      {vehicles.map((vehicle) => (
         <VehicleMarker key={vehicle.deviceId} vehicle={vehicle} onSelect={onVehicleSelect} />
       ))}
     </MapContainer>
@@ -130,90 +129,6 @@ function StopClickHandler({
   });
 
   return null;
-}
-
-function useAnimatedVehicles(vehicles: FleetVehicle[]) {
-  const [displayedVehicles, setDisplayedVehicles] = useState(vehicles);
-  const displayedRef = useRef(vehicles);
-  const targetRef = useRef(vehicles);
-
-  useEffect(() => {
-    targetRef.current = vehicles;
-
-    if (displayedRef.current.length === 0) {
-      displayedRef.current = vehicles;
-      setDisplayedVehicles(vehicles);
-      return;
-    }
-
-    const starts = displayedRef.current;
-    const startedAt = performance.now();
-    const duration = animationDuration(starts, vehicles);
-    let frame = 0;
-
-    if (duration === 0) {
-      displayedRef.current = vehicles;
-      setDisplayedVehicles(vehicles);
-      return;
-    }
-
-    const step = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const nextVehicles = targetRef.current.map((target) => {
-        const start = starts.find((vehicle) => vehicle.deviceId === target.deviceId);
-        if (!start) return target;
-
-        return {
-          ...target,
-          latitude: start.latitude + (target.latitude - start.latitude) * eased,
-          longitude: start.longitude + (target.longitude - start.longitude) * eased
-        };
-      });
-
-      displayedRef.current = nextVehicles;
-      setDisplayedVehicles(nextVehicles);
-
-      if (progress < 1) {
-        frame = window.requestAnimationFrame(step);
-      }
-    };
-
-    frame = window.requestAnimationFrame(step);
-    return () => window.cancelAnimationFrame(frame);
-  }, [vehicles]);
-
-  return displayedVehicles;
-}
-
-function animationDuration(starts: FleetVehicle[], targets: FleetVehicle[]) {
-  const movingTargets = targets.filter((target) => target.speedKmh >= 3);
-  if (movingTargets.length === 0) return 0;
-
-  const durations = movingTargets.map((target) => {
-    const start = starts.find((vehicle) => vehicle.deviceId === target.deviceId);
-    if (!start) return 0;
-
-    const reportDeltaMs = new Date(target.fixTime).getTime() - new Date(start.fixTime).getTime();
-    const distance = distanceMeters(start.latitude, start.longitude, target.latitude, target.longitude);
-    if (!Number.isFinite(distance) || distance < 3 || distance > 1500) return 0;
-    if (!Number.isFinite(reportDeltaMs) || reportDeltaMs <= 0) return 15000;
-    return Math.min(30000, Math.max(8000, reportDeltaMs));
-  });
-
-  return Math.max(...durations, 0);
-}
-
-function distanceMeters(startLat: number, startLon: number, endLat: number, endLon: number) {
-  const earthRadius = 6371000;
-  const lat1 = (startLat * Math.PI) / 180;
-  const lat2 = (endLat * Math.PI) / 180;
-  const deltaLat = ((endLat - startLat) * Math.PI) / 180;
-  const deltaLon = ((endLon - startLon) * Math.PI) / 180;
-  const a =
-    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function MapSizeWatcher() {
