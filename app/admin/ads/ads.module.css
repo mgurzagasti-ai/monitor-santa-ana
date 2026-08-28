@@ -341,3 +341,24 @@
     grid-template-columns: 1fr;
   }
 }
+
+.listDangerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff;
+  color: #b42318;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.listDangerButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}

@@ -159,6 +159,12 @@ export default function AdsAdminPage() {
               </button>
             ))}
           </div>
+          {selectedPublication ? (
+            <button className={styles.listDangerButton} onClick={() => deletePublication(selectedPublication.id)} disabled={saving}>
+              <Trash2 size={17} />
+              <span>Borrar seleccionada</span>
+            </button>
+          ) : null}
         </aside>
 
         <section className={styles.formPanel}>
@@ -315,5 +321,6 @@ function nextMonthIso() {
   date.setMonth(date.getMonth() + 1);
   return date.toISOString();
 }
+
 
 
