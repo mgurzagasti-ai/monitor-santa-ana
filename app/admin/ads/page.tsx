@@ -170,19 +170,19 @@ export default function AdsAdminPage() {
           <div className={styles.formGrid}>
             <label className={styles.field}>
               <span>Titulo</span>
-              <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Pizzeria Don Jose" />
+              <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Ej: Pizzeria Don Jose" />
             </label>
             <label className={styles.field}>
               <span>Texto corto</span>
-              <input value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} placeholder="20% de descuento" />
+              <input value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} placeholder="Ej: 20% de descuento" />
             </label>
             <label className={`${styles.field} ${styles.fullField}`}>
               <span>URL de imagen HTTPS</span>
-              <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="https://..." />
+              <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="Ej: https://dominio.com/banner.jpg" />
             </label>
             <label className={styles.field}>
               <span>Boton</span>
-              <input value={draft.buttonText} onChange={(event) => setDraft({ ...draft, buttonText: event.target.value })} placeholder="Consultar" />
+              <input value={draft.buttonText} onChange={(event) => setDraft({ ...draft, buttonText: event.target.value })} placeholder="Ej: Consultar" />
             </label>
             <label className={styles.field}>
               <span>Destino</span>
@@ -196,7 +196,7 @@ export default function AdsAdminPage() {
             </label>
             <label className={`${styles.field} ${styles.fullField}`}>
               <span>URL de destino</span>
-              <input value={draft.destinationUrl} onChange={(event) => setDraft({ ...draft, destinationUrl: event.target.value })} placeholder="https://wa.me/549..." disabled={draft.destinationType === "none"} />
+              <input value={draft.destinationUrl} onChange={(event) => setDraft({ ...draft, destinationUrl: event.target.value })} placeholder="Ej: https://wa.me/5493881234567" disabled={draft.destinationType === "none"} />
             </label>
           </div>
 
@@ -238,6 +238,7 @@ export default function AdsAdminPage() {
             </div>
           </div>
 
+          {message ? <p className={styles.message}>{message}</p> : null}
           <div className={styles.actionRow}>
             <button className={styles.primaryButton} onClick={savePublication} disabled={saving}>
               <Save size={18} />
@@ -250,8 +251,7 @@ export default function AdsAdminPage() {
               </button>
             ) : null}
           </div>
-          {message ? <p className={styles.message}>{message}</p> : null}
-        </section>
+       </section>
 
         <aside className={styles.previewPanel}>
           <div className={styles.sectionHeader}>
@@ -315,3 +315,5 @@ function nextMonthIso() {
   date.setMonth(date.getMonth() + 1);
   return date.toISOString();
 }
+
+
