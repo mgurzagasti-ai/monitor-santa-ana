@@ -176,6 +176,10 @@ function isPublicationActive(publication: AdPublication, placement: AdPlacementC
   return publication.active && publication.placements.includes(placement) && Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= now && endsAt >= now;
 }
 
+
+function isPlacementMatch(publication: AdPublication, placement: AdPlacementCode) {
+  return publication.placements.includes(placement) || publication.placements.includes("MAIN_BOTTOM");
+}
 function normalizeDestinationType(value: unknown): AdDestinationType {
   return allowedDestinationTypes.includes(value as AdDestinationType) ? (value as AdDestinationType) : "website";
 }
@@ -235,3 +239,4 @@ function placementName(code: AdPlacementCode) {
       return "Principal";
   }
 }
+
