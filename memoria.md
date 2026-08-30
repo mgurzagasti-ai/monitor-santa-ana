@@ -76,3 +76,54 @@
 - Se preparo el orden de linea 15 usando las trazas `IDA LINEA 15` y `VUELTA LINEA 15` del KML publico.
 - Se protegio `/api/line-stops` con la misma autenticacion basica del monitor; `/api/public/line-stops` sigue abierto para la APK.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## Configuracion GPS santa01 - 21/08/2026
+
+- GPS configurado por SMS y conectado correctamente a Traccar demo.
+- Modelo/protocolo detectado: GT06 / QS111.
+- IMEI / Unique ID: 359015562902671.
+- Nombre en Traccar: santa01.
+- Servidor GPS: demo4.traccar.org.
+- Puerto GPS Traccar: 5023.
+- APN Claro Argentina: igprs.claro.com.ar.
+- Estado verificado: en linea y reportando ubicacion real en Jujuy.
+- Coordenada real observada en Traccar: -24.19006, -65.28474.
+- Comando de consulta usado: CXZT.
+- Intervalo recomendado para no abusar del demo de Traccar: SZCS#FREQ=60.
+- Implementacion monitor: commit 307f76f Add GPS assignment manager to monitor subido a origin/main.
+- Flujo monitor: boton + -> Cargar GPS -> seleccionar santa01 / 359015562902671 -> cargar interno -> elegir linea -> Guardar GPS.
+- Nota: la asignacion actual del monitor se guarda en localStorage del navegador como santaAnaMonitorDevices. Para uso multiusuario centralizado conviene migrarlo a Redis/Base de datos.
+
+## 2026-08-28 - Publicidad propia en produccion
+
+- Se implemento un sistema simple de publicaciones publicitarias propias administrado desde el monitor web, sin necesidad de actualizar la APK para cambiar banners.
+- Panel disponible en `/admin/ads`, protegido con autenticacion basica usando `ADS_ADMIN_PASSWORD` y fallback a `MONITOR_OPERATOR_PASSWORD`.
+- API publica disponible en `/api/ads/active?placement=...` para que la APK consulte publicaciones activas.
+- API admin disponible en `/api/admin/ads/publications` para listar, crear, editar y borrar publicaciones.
+- Persistencia: usa Upstash Redis cuando estan configuradas `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`; `app/data/adPublications.json` queda como respaldo local/desarrollo.
+- Las publicaciones se consideran disponibles si estan activas, dentro del rango de fechas y asignadas al placement consultado.
+- `MAIN_BOTTOM` funciona como fallback global: una publicacion marcada como Principal puede mostrarse tambien en Lineas, Mapa, Favoritos y Perfil.
+- El panel permite configurar titulo, texto corto, URL HTTPS de imagen, boton, tipo/direccion de destino, fechas, prioridad, segundos de rotacion y ubicaciones.
+- Se agrego boton visible para borrar publicaciones desde la lista del panel.
+- Produccion en Vercel quedo desplegada desde `main`; ultimo despliegue verificado como `Ready` en `Production`.
+- Commits relevantes:
+  - `fd46f4e Add owned advertising admin`
+  - `30eda7f Clarify ad admin form feedback`
+  - `d320028 Show delete action in ads list`
+  - `c512619 Use main ad placement as global fallback`
+- Verificacion: `npm.cmd run build` termino correctamente y Vercel mostro el deploy `c512619` listo en produccion.
+## 2026-08-30 - Correccion de publicidad local
+
+- Se leyeron los documentos `.md` para retomar contexto de modificaciones.
+- Se corrigio `app/data/advertising.ts` para que las publicaciones nuevas no puedan quedar con `id` vacio.
+- Se activo correctamente el fallback global de `MAIN_BOTTOM` en `/api/ads/active`, usando la funcion `isPlacementMatch` al filtrar publicaciones activas.
+- Se corrigieron los IDs vacios del respaldo local `app/data/adPublications.json`.
+- Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-08-30 - Responsive admin de publicidades
+
+- Se ajusto la pagina protegida /admin/ads para celulares.
+- El layout ahora apila paneles, usa botones al ancho disponible y evita que textos largos oculten controles.
+- Verificacion: 
+pm.cmd run build termino correctamente.
+

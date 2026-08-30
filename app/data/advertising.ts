@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isRedisConfigured, redisCommand } from "./redis";
@@ -90,6 +90,7 @@ export function normalizePlacement(value: string | null | undefined): AdPlacemen
 }
 
 function normalizeAdPublication(payload: Partial<AdPublication>, existing: AdPublication | undefined, now: string): AdPublication {
+  const payloadId = String(payload.id ?? "").trim();
   const title = String(payload.title ?? existing?.title ?? "").trim();
   const subtitle = String(payload.subtitle ?? existing?.subtitle ?? "").trim();
   const imageUrl = String(payload.imageUrl ?? existing?.imageUrl ?? "").trim();
@@ -108,7 +109,7 @@ function normalizeAdPublication(payload: Partial<AdPublication>, existing: AdPub
   if (new Date(startDate).getTime() > new Date(endDate).getTime()) throw new Error("La fecha de inicio no puede ser posterior al fin");
 
   return {
-    id: existing?.id ?? payload.id?.trim() ?? `ad-${randomUUID().slice(0, 8)}`,
+    id: existing?.id || payloadId || `ad-${randomUUID().slice(0, 8)}`,
     title,
     subtitle,
     imageUrl,
@@ -173,7 +174,7 @@ async function writeRedisAdPublications(publications: AdPublication[]) {
 function isPublicationActive(publication: AdPublication, placement: AdPlacementCode, now: number) {
   const startsAt = new Date(publication.startDate).getTime();
   const endsAt = new Date(publication.endDate).getTime();
-  return publication.active && publication.placements.includes(placement) && Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= now && endsAt >= now;
+  return publication.active && isPlacementMatch(publication, placement) && Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= now && endsAt >= now;
 }
 
 
@@ -239,4 +240,3 @@ function placementName(code: AdPlacementCode) {
       return "Principal";
   }
 }
-

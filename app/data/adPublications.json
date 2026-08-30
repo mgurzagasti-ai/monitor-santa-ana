@@ -1,1 +1,48 @@
-﻿[]
+[
+  {
+    "id": "ad-publicita-aqui",
+    "title": "publicita aqui",
+    "subtitle": "contactanos",
+    "imageUrl": "https://placehold.co/1200x400/f57c00/ffffff/png?text=Pizzeria+Don+Jose+-+20%25+de+descuento",
+    "buttonText": "Consultar",
+    "destinationType": "whatsapp",
+    "destinationUrl": "https://wa.me/5493884082963",
+    "placements": [
+      "MAIN_BOTTOM",
+      "LINES_BOTTOM",
+      "MAP_BOTTOM",
+      "FAVORITES_BOTTOM",
+      "PROFILE_BOTTOM"
+    ],
+    "active": true,
+    "startDate": "2026-08-28T00:00:00.000Z",
+    "endDate": "2026-09-28T23:59:59.999Z",
+    "priority": 0,
+    "durationSeconds": 8,
+    "createdAt": "2026-08-28T18:33:57.140Z",
+    "updatedAt": "2026-08-28T18:33:57.140Z"
+  },
+  {
+    "id": "ad-pizzeria-don-jose",
+    "title": "pizeria don jose",
+    "subtitle": "la mejor visitanos",
+    "imageUrl": "https://placehold.co/1200x400/f57c00/ffffff/png?text=Pizzeria+Don+Jose+-+20%25+de+descuento",
+    "buttonText": "Consultar",
+    "destinationType": "whatsapp",
+    "destinationUrl": "https://wa.me/5493884082963",
+    "placements": [
+      "MAIN_BOTTOM",
+      "LINES_BOTTOM",
+      "MAP_BOTTOM",
+      "FAVORITES_BOTTOM",
+      "PROFILE_BOTTOM"
+    ],
+    "active": true,
+    "startDate": "2026-08-28T00:00:00.000Z",
+    "endDate": "2026-09-28T23:59:59.999Z",
+    "priority": 0,
+    "durationSeconds": 8,
+    "createdAt": "2026-08-28T18:29:32.403Z",
+    "updatedAt": "2026-08-28T18:29:32.403Z"
+  }
+]
