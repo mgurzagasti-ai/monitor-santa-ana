@@ -41,8 +41,18 @@ export function getAdPlacements() {
 
 export async function readAdPublications(): Promise<AdPublication[]> {
   const remotePublications = await readRedisAdPublications();
-  if (remotePublications) return remotePublications;
-  return readLocalAdPublications();
+  const publications = remotePublications ?? (await readLocalAdPublications());
+  const repairedPublications = repairPublicationIds(publications);
+
+  if (repairedPublications.changed) {
+    try {
+      await writeAdPublications(repairedPublications.publications);
+    } catch {
+      // Keep the repaired IDs in this response even if persistence is temporarily unavailable.
+    }
+  }
+
+  return repairedPublications.publications;
 }
 
 export async function saveAdPublication(payload: Partial<AdPublication>): Promise<AdPublication> {
@@ -169,6 +179,44 @@ async function readRedisAdPublications(): Promise<AdPublication[] | null> {
 async function writeRedisAdPublications(publications: AdPublication[]) {
   if (!isRedisConfigured()) return;
   await redisCommand(["SET", adPublicationsRedisKey, JSON.stringify(publications)]);
+}
+
+function repairPublicationIds(publications: AdPublication[]) {
+  const usedIds = new Set<string>();
+  let changed = false;
+
+  const repaired = publications.map((publication, index) => {
+    const currentId = publication.id.trim();
+    const id = currentId && !usedIds.has(currentId) ? currentId : buildFallbackPublicationId(publication, index, usedIds);
+    usedIds.add(id);
+
+    if (id === publication.id) return publication;
+    changed = true;
+    return { ...publication, id, updatedAt: publication.updatedAt || new Date().toISOString() };
+  });
+
+  return { publications: repaired, changed };
+}
+
+function buildFallbackPublicationId(publication: AdPublication, index: number, usedIds: Set<string>) {
+  const titleSlug = publication.title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 32);
+  const datePart = publication.createdAt.replace(/[^0-9]/g, "").slice(0, 12);
+  const baseId = `ad-${titleSlug || "publicacion"}-${datePart || index + 1}`;
+  let id = baseId;
+  let suffix = 2;
+
+  while (usedIds.has(id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return id;
 }
 
 function isPublicationActive(publication: AdPublication, placement: AdPlacementCode, now: number) {

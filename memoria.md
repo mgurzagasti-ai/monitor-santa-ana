@@ -127,3 +127,11 @@
 - Verificacion: 
 pm.cmd run build termino correctamente.
 
+
+## 2026-08-30 - IDs unicos en publicaciones
+
+- Se corrigio la lectura de publicaciones para reparar automaticamente IDs vacios o duplicados.
+- Esto evita que al seleccionar o borrar una publicacion se afecten varias publicaciones antiguas con el mismo ID.
+- Verificacion: 
+pm.cmd run build termino correctamente.
+
