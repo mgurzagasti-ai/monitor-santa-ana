@@ -125,8 +125,8 @@ export default function AdsAdminPage() {
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      setMessage("La imagen es muy grande. Usa una foto de hasta 8 MB.");
+    if (file.size > 4 * 1024 * 1024) {
+      setMessage("La imagen es muy grande. Usa una foto de hasta 4 MB.");
       return;
     }
 

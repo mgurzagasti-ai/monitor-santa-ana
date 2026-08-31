@@ -164,3 +164,11 @@ pm.cmd run build termino correctamente.
 - Verificacion: 
 pm.cmd run build termino correctamente.
 
+
+## 2026-08-30 - Limite de imagenes Blob
+
+- Se ajusto el limite de subida de imagenes de publicidades a 4 MB para respetar el limite de uploads por servidor de Vercel.
+- La validacion se aplica en el formulario y en /api/admin/ads/images.
+- Verificacion: 
+pm.cmd run build termino correctamente.
+
