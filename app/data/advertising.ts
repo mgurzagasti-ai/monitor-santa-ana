@@ -114,7 +114,6 @@ function normalizeAdPublication(payload: Partial<AdPublication>, existing: AdPub
   const durationSeconds = normalizeNumber(payload.durationSeconds ?? existing?.durationSeconds, 8, 4, 60);
 
   if (!title) throw new Error("Falta titulo");
-  if (!imageUrl) throw new Error("Falta URL de imagen");
   if (destinationType !== "none" && !destinationUrl) throw new Error("Falta enlace de destino");
   if (new Date(startDate).getTime() > new Date(endDate).getTime()) throw new Error("La fecha de inicio no puede ser posterior al fin");
 

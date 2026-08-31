@@ -135,3 +135,12 @@ pm.cmd run build termino correctamente.
 - Verificacion: 
 pm.cmd run build termino correctamente.
 
+
+## 2026-08-30 - Imagen opcional en publicidades
+
+- Se hizo opcional el campo URL de imagen HTTPS en /admin/ads.
+- La API ya permite guardar publicaciones sin imagen cargada.
+- El formulario muestra el campo como opcional.
+- Verificacion: 
+pm.cmd run build termino correctamente.
+

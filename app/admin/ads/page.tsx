@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Calendar, ExternalLink, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -183,8 +183,8 @@ export default function AdsAdminPage() {
               <input value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} placeholder="Ej: 20% de descuento" />
             </label>
             <label className={`${styles.field} ${styles.fullField}`}>
-              <span>URL de imagen HTTPS</span>
-              <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="Ej: https://dominio.com/banner.jpg" />
+              <span>URL de imagen HTTPS (opcional)</span>
+              <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="Opcional: https://dominio.com/banner.jpg" />
             </label>
             <label className={styles.field}>
               <span>Boton</span>
