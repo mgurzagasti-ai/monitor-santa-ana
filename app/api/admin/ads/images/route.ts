@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
     const blob = await put(pathname, file, {
       access: "public",
       addRandomSuffix: false,
-      contentType: file.type
+      contentType: file.type,
+      storeId: process.env.ADS_BLOB_STORE_ID
     });
 
     return NextResponse.json({
