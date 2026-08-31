@@ -1,7 +1,8 @@
 "use client";
 
-import { Calendar, ExternalLink, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react";
+import { Calendar, ExternalLink, Image as ImageIcon, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent } from "react";
 import styles from "./ads.module.css";
 
 type DestinationType = "whatsapp" | "website" | "instagram" | "facebook" | "none";
@@ -110,6 +111,31 @@ export default function AdsAdminPage() {
     }
   }
 
+  async function handleImageFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("Selecciona una imagen valida.");
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setMessage("La imagen es muy grande. Usa una foto de hasta 8 MB.");
+      return;
+    }
+
+    try {
+      setMessage("Preparando imagen...");
+      const imageUrl = await resizeImageFile(file);
+      setDraft((current) => ({ ...current, imageUrl }));
+      setMessage("Imagen cargada. Guarda la publicacion para publicarla.");
+    } catch {
+      setMessage("No se pudo cargar la imagen.");
+    }
+  }
+
   function togglePlacement(code: PlacementCode) {
     setDraft((current) => {
       const placements = current.placements.includes(code)
@@ -183,9 +209,22 @@ export default function AdsAdminPage() {
               <input value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} placeholder="Ej: 20% de descuento" />
             </label>
             <label className={`${styles.field} ${styles.fullField}`}>
-              <span>URL de imagen HTTPS (opcional)</span>
+              <span>Imagen</span>
               <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="Opcional: https://dominio.com/banner.jpg" />
             </label>
+            <div className={`${styles.imageTools} ${styles.fullField}`}>
+              <label className={styles.uploadButton}>
+                <Upload size={18} />
+                <span>Cargar foto</span>
+                <input type="file" accept="image/*" onChange={handleImageFile} />
+              </label>
+              {draft.imageUrl ? (
+                <button type="button" className={styles.clearImageButton} onClick={() => setDraft({ ...draft, imageUrl: "" })}>
+                  <X size={18} />
+                  <span>Quitar imagen</span>
+                </button>
+              ) : null}
+            </div>
             <label className={styles.field}>
               <span>Boton</span>
               <input value={draft.buttonText} onChange={(event) => setDraft({ ...draft, buttonText: event.target.value })} placeholder="Ej: Consultar" />
@@ -316,11 +355,45 @@ function fromDateInputValue(value: string, mode: "start" | "end") {
   return value ? `${value}${suffix}` : new Date().toISOString();
 }
 
+async function resizeImageFile(file: File) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(dataUrl);
+  const maxWidth = 1200;
+  const maxHeight = 600;
+  const ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+  const width = Math.max(1, Math.round(image.width * ratio));
+  const height = Math.max(1, Math.round(image.height * ratio));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas no disponible");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
 function nextMonthIso() {
   const date = new Date();
   date.setMonth(date.getMonth() + 1);
   return date.toISOString();
 }
-
-
-

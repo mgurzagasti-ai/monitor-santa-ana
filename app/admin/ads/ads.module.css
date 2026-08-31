@@ -1,4 +1,4 @@
-﻿.shell {
+.shell {
   min-height: 100vh;
   overflow: auto;
   padding: 24px;
@@ -177,6 +177,41 @@
 
 .field input:disabled {
   opacity: 0.55;
+}
+
+.imageTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.uploadButton,
+.clearImageButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.uploadButton {
+  border: 1px solid var(--accent);
+  background: #fff7ed;
+  color: var(--accent-dark);
+}
+
+.uploadButton input {
+  display: none;
+}
+
+.clearImageButton {
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #b42318;
 }
 
 .optionsGrid {
@@ -479,4 +514,3 @@
     grid-column: auto;
   }
 }
-

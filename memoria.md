@@ -144,3 +144,12 @@ pm.cmd run build termino correctamente.
 - Verificacion: 
 pm.cmd run build termino correctamente.
 
+
+## 2026-08-30 - Carga de foto en publicidades
+
+- Se agrego un boton Cargar foto en la pagina protegida /admin/ads.
+- La imagen seleccionada se reduce en el navegador y se guarda embebida en la publicacion, sin requerir una URL externa.
+- Se agrego boton Quitar imagen y se mantiene la opcion de pegar una URL manualmente.
+- Verificacion: 
+pm.cmd run build termino correctamente.
+
