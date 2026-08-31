@@ -153,3 +153,14 @@ pm.cmd run build termino correctamente.
 - Verificacion: 
 pm.cmd run build termino correctamente.
 
+
+## 2026-08-30 - Imagenes de publicidades en Vercel Blob
+
+- Se reemplazo la carga embebida de fotos por subida real a Vercel Blob desde /api/admin/ads/images.
+- Las publicaciones guardan imageUrl, imageStorage e imagePath; Redis conserva solo metadatos y la URL.
+- Al borrar una publicacion o reemplazar su imagen, se borra tambien el blob anterior cuando corresponde.
+- Se agrego la dependencia @vercel/blob.
+- Requisito de produccion: configurar/conectar Vercel Blob para disponer de BLOB_READ_WRITE_TOKEN.
+- Verificacion: 
+pm.cmd run build termino correctamente.
+

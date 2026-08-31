@@ -13,6 +13,8 @@ type AdPublication = {
   title: string;
   subtitle: string;
   imageUrl: string;
+  imageStorage: "external" | "vercel-blob" | "";
+  imagePath: string;
   buttonText: string;
   destinationType: DestinationType;
   destinationUrl: string;
@@ -38,6 +40,8 @@ const emptyDraft: Draft = {
   title: "",
   subtitle: "",
   imageUrl: "",
+  imageStorage: "",
+  imagePath: "",
   buttonText: "Consultar",
   destinationType: "whatsapp",
   destinationUrl: "",
@@ -126,13 +130,25 @@ export default function AdsAdminPage() {
       return;
     }
 
+    setSaving(true);
+    setMessage("Subiendo imagen...");
     try {
-      setMessage("Preparando imagen...");
-      const imageUrl = await resizeImageFile(file);
-      setDraft((current) => ({ ...current, imageUrl }));
-      setMessage("Imagen cargada. Guarda la publicacion para publicarla.");
-    } catch {
-      setMessage("No se pudo cargar la imagen.");
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/admin/ads/images", { method: "POST", body: formData });
+      const data = (await response.json()) as { imageUrl?: string; imageStorage?: "vercel-blob"; imagePath?: string; error?: string };
+      if (!response.ok || !data.imageUrl || !data.imagePath) throw new Error(data.error ?? "No se pudo subir la imagen");
+      setDraft((current) => ({
+        ...current,
+        imageUrl: data.imageUrl ?? "",
+        imageStorage: data.imageStorage ?? "vercel-blob",
+        imagePath: data.imagePath ?? ""
+      }));
+      setMessage("Imagen subida. Guarda la publicacion para publicarla.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo subir la imagen.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -210,7 +226,7 @@ export default function AdsAdminPage() {
             </label>
             <label className={`${styles.field} ${styles.fullField}`}>
               <span>Imagen</span>
-              <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} placeholder="Opcional: https://dominio.com/banner.jpg" />
+              <input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value, imageStorage: event.target.value ? "external" : "", imagePath: "" })} placeholder="Opcional: https://dominio.com/banner.jpg" />
             </label>
             <div className={`${styles.imageTools} ${styles.fullField}`}>
               <label className={styles.uploadButton}>
@@ -219,7 +235,7 @@ export default function AdsAdminPage() {
                 <input type="file" accept="image/*" onChange={handleImageFile} />
               </label>
               {draft.imageUrl ? (
-                <button type="button" className={styles.clearImageButton} onClick={() => setDraft({ ...draft, imageUrl: "" })}>
+                <button type="button" className={styles.clearImageButton} onClick={() => setDraft({ ...draft, imageUrl: "", imageStorage: "", imagePath: "" })}>
                   <X size={18} />
                   <span>Quitar imagen</span>
                 </button>
@@ -332,6 +348,8 @@ function toDraft(publication: AdPublication): Draft {
     title: publication.title,
     subtitle: publication.subtitle,
     imageUrl: publication.imageUrl,
+    imageStorage: publication.imageStorage ?? (publication.imageUrl ? "external" : ""),
+    imagePath: publication.imagePath ?? "",
     buttonText: publication.buttonText,
     destinationType: publication.destinationType,
     destinationUrl: publication.destinationUrl,
@@ -353,43 +371,6 @@ function toDateInputValue(value: string) {
 function fromDateInputValue(value: string, mode: "start" | "end") {
   const suffix = mode === "start" ? "T00:00:00.000Z" : "T23:59:59.999Z";
   return value ? `${value}${suffix}` : new Date().toISOString();
-}
-
-async function resizeImageFile(file: File) {
-  const dataUrl = await readFileAsDataUrl(file);
-  const image = await loadImage(dataUrl);
-  const maxWidth = 1200;
-  const maxHeight = 600;
-  const ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
-  const width = Math.max(1, Math.round(image.width * ratio));
-  const height = Math.max(1, Math.round(image.height * ratio));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas no disponible");
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-  context.drawImage(image, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", 0.82);
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  });
 }
 
 function nextMonthIso() {

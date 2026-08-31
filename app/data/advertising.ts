@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { del } from "@vercel/blob";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isRedisConfigured, redisCommand } from "./redis";
@@ -6,11 +7,15 @@ import { isRedisConfigured, redisCommand } from "./redis";
 export type AdDestinationType = "whatsapp" | "website" | "instagram" | "facebook" | "none";
 export type AdPlacementCode = "MAIN_BOTTOM" | "LINES_BOTTOM" | "MAP_BOTTOM" | "FAVORITES_BOTTOM" | "PROFILE_BOTTOM";
 
+export type AdImageStorage = "external" | "vercel-blob" | "";
+
 export type AdPublication = {
   id: string;
   title: string;
   subtitle: string;
   imageUrl: string;
+  imageStorage: AdImageStorage;
+  imagePath: string;
   buttonText: string;
   destinationType: AdDestinationType;
   destinationUrl: string;
@@ -65,12 +70,15 @@ export async function saveAdPublication(payload: Partial<AdPublication>): Promis
     : [publication, ...publications];
 
   await writeAdPublications(nextPublications);
+  await deleteReplacedBlobImage(existing ?? undefined, publication);
   return publication;
 }
 
 export async function deleteAdPublication(id: string) {
   const publications = await readAdPublications();
+  const removedPublications = publications.filter((publication) => publication.id === id);
   await writeAdPublications(publications.filter((publication) => publication.id !== id));
+  await Promise.all(removedPublications.map((publication) => deleteBlobImage(publication.imagePath)));
 }
 
 export async function getActiveAds(placement: string | null): Promise<PublicAd[]> {
@@ -104,6 +112,8 @@ function normalizeAdPublication(payload: Partial<AdPublication>, existing: AdPub
   const title = String(payload.title ?? existing?.title ?? "").trim();
   const subtitle = String(payload.subtitle ?? existing?.subtitle ?? "").trim();
   const imageUrl = String(payload.imageUrl ?? existing?.imageUrl ?? "").trim();
+  const imageStorage = normalizeImageStorage(payload.imageStorage ?? existing?.imageStorage, imageUrl);
+  const imagePath = imageStorage === "vercel-blob" ? String(payload.imagePath ?? existing?.imagePath ?? "").trim() : "";
   const buttonText = String(payload.buttonText ?? existing?.buttonText ?? "Ver").trim();
   const destinationType = normalizeDestinationType(payload.destinationType ?? existing?.destinationType);
   const destinationUrl = String(payload.destinationUrl ?? existing?.destinationUrl ?? "").trim();
@@ -122,6 +132,8 @@ function normalizeAdPublication(payload: Partial<AdPublication>, existing: AdPub
     title,
     subtitle,
     imageUrl,
+    imageStorage,
+    imagePath,
     buttonText,
     destinationType,
     destinationUrl: destinationType === "none" ? "" : destinationUrl,
@@ -228,6 +240,29 @@ function isPublicationActive(publication: AdPublication, placement: AdPlacementC
 function isPlacementMatch(publication: AdPublication, placement: AdPlacementCode) {
   return publication.placements.includes(placement) || publication.placements.includes("MAIN_BOTTOM");
 }
+
+async function deleteReplacedBlobImage(existing: AdPublication | undefined, publication: AdPublication) {
+  if (!existing) return;
+  if (existing.imagePath && existing.imagePath !== publication.imagePath) {
+    await deleteBlobImage(existing.imagePath);
+  }
+}
+
+async function deleteBlobImage(pathname: string) {
+  if (!pathname) return;
+  try {
+    await del(pathname);
+  } catch {
+    // A missing blob should not block deleting or saving the publication.
+  }
+}
+
+function normalizeImageStorage(value: unknown, imageUrl: string): AdImageStorage {
+  if (value === "vercel-blob") return "vercel-blob";
+  if (value === "external") return "external";
+  return imageUrl ? "external" : "";
+}
+
 function normalizeDestinationType(value: unknown): AdDestinationType {
   return allowedDestinationTypes.includes(value as AdDestinationType) ? (value as AdDestinationType) : "website";
 }
