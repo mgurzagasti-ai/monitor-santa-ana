@@ -6,7 +6,7 @@ import type { ChangeEvent } from "react";
 import styles from "./ads.module.css";
 
 type DestinationType = "whatsapp" | "website" | "instagram" | "facebook" | "none";
-type PlacementCode = "MAIN_BOTTOM" | "LINES_BOTTOM" | "MAP_BOTTOM" | "FAVORITES_BOTTOM" | "PROFILE_BOTTOM";
+type PlacementCode = "MAIN_BOTTOM" | "LINES_BOTTOM" | "MAP_BOTTOM" | "NEWS_BOTTOM" | "FAVORITES_BOTTOM" | "PROFILE_BOTTOM";
 
 type AdPublication = {
   id: string;

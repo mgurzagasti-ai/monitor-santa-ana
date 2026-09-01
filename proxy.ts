@@ -1,7 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const protectedPaths = ["/", "/api/fleet", "/api/assignments", "/api/line-stops"];
-const adsAdminPaths = ["/admin/ads", "/api/admin/ads"];
+const adsAdminPaths = ["/admin/ads", "/api/admin/ads", "/admin/app-version", "/api/admin/app-version"];
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -48,6 +48,10 @@ export const config = {
     "/admin/ads",
     "/admin/ads/:path*",
     "/api/admin/ads",
-    "/api/admin/ads/:path*"
+    "/api/admin/ads/:path*",
+    "/admin/app-version",
+    "/admin/app-version/:path*",
+    "/api/admin/app-version",
+    "/api/admin/app-version/:path*"
   ]
 };

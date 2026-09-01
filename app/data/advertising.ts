@@ -5,7 +5,7 @@ import path from "node:path";
 import { isRedisConfigured, redisCommand } from "./redis";
 
 export type AdDestinationType = "whatsapp" | "website" | "instagram" | "facebook" | "none";
-export type AdPlacementCode = "MAIN_BOTTOM" | "LINES_BOTTOM" | "MAP_BOTTOM" | "FAVORITES_BOTTOM" | "PROFILE_BOTTOM";
+export type AdPlacementCode = "MAIN_BOTTOM" | "LINES_BOTTOM" | "MAP_BOTTOM" | "NEWS_BOTTOM" | "FAVORITES_BOTTOM" | "PROFILE_BOTTOM";
 
 export type AdImageStorage = "external" | "vercel-blob" | "";
 
@@ -38,7 +38,7 @@ const adPublicationsFilePath = path.join(process.cwd(), "app", "data", "adPublic
 const adPublicationsRedisKey = "ad_publications_v1";
 
 const allowedDestinationTypes: AdDestinationType[] = ["whatsapp", "website", "instagram", "facebook", "none"];
-const allowedPlacements: AdPlacementCode[] = ["MAIN_BOTTOM", "LINES_BOTTOM", "MAP_BOTTOM", "FAVORITES_BOTTOM", "PROFILE_BOTTOM"];
+const allowedPlacements: AdPlacementCode[] = ["MAIN_BOTTOM", "LINES_BOTTOM", "MAP_BOTTOM", "NEWS_BOTTOM", "PROFILE_BOTTOM"];
 
 export function getAdPlacements() {
   return allowedPlacements.map((code) => ({ code, name: placementName(code) }));

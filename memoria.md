@@ -204,3 +204,12 @@ pm.cmd run build termino correctamente.
 - La respuesta incluye titulo, mensaje, URL de Google Play, flag `required` y `updatedAt`.
 - Se puede ajustar desde variables de entorno en Vercel: `PUBLIC_APP_LATEST_VERSION_CODE`, `PUBLIC_APP_LATEST_VERSION_NAME`, `PUBLIC_APP_VERSION_TITLE`, `PUBLIC_APP_VERSION_MESSAGE`, `PUBLIC_APP_PLAY_STORE_URL`, `PUBLIC_APP_PACKAGE_ID`, `PUBLIC_APP_UPDATE_REQUIRED`.
 - Verificacion: `npm.cmd run build` termino correctamente y listo `/api/public/app-version`.
+
+## 2026-09-01 - Admin de version APK
+
+- Se agrego pantalla protegida `/admin/app-version` para administrar el aviso de nueva version de la APK desde el monitor.
+- Se agrego API admin `/api/admin/app-version` con `GET` y `POST`.
+- `app/data/appVersion.ts` ahora persiste la configuracion en Upstash Redis si esta disponible, con respaldo local `app/data/appVersion.json`.
+- La version publicada por defecto queda `latestVersionCode=5`, `latestVersionName=1.1.3`, con mensaje indicando que quita publicidades externas de Novedades.
+- Se agrego `NEWS_BOTTOM` como ubicacion de publicidad administrable y se mantiene compatibilidad de tipo con `FAVORITES_BOTTOM` viejo.
+- Verificacion: `npm.cmd run build` termino correctamente.

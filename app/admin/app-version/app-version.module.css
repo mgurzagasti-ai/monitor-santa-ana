@@ -1,0 +1,204 @@
+.shell {
+  min-height: 100vh;
+  background: #f6f5ee;
+  color: #111827;
+  padding: 24px;
+}
+
+.headerBand,
+.formPanel,
+.previewPanel {
+  background: #ffffff;
+  border: 1px solid #ded8bd;
+  border-radius: 8px;
+}
+
+.headerBand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto 18px;
+  max-width: 1200px;
+  padding: 20px;
+}
+
+.headerBand span,
+.sectionHeader span {
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.headerBand h1 {
+  margin: 4px 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.headerBand p,
+.helpText {
+  color: #53615b;
+  margin: 0;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.formPanel,
+.previewPanel {
+  padding: 18px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sectionHeader small {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  color: #53615b;
+}
+
+.field input,
+.field textarea {
+  border: 1px solid #d8cf9f;
+  border-radius: 8px;
+  color: #111827;
+  font: inherit;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.switchRow {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.primaryButton,
+.secondaryButton {
+  align-items: center;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
+.primaryButton {
+  background: #facc15;
+  border: 1px solid #eab308;
+  color: #111827;
+}
+
+.secondaryButton {
+  background: #ffffff;
+  border: 1px solid #d8cf9f;
+  color: #b45309;
+}
+
+.message {
+  color: #b45309;
+  font-weight: 700;
+  margin: 14px 0 0;
+}
+
+.previewCard {
+  background: #171714;
+  border-radius: 8px;
+  color: #fff7d6;
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.previewCard strong {
+  font-size: 20px;
+}
+
+.previewCard span,
+.previewCard p {
+  color: #d6c783;
+  margin: 0;
+}
+
+.previewButton {
+  align-items: center;
+  background: #facc15;
+  border-radius: 8px;
+  color: #111827;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.helpText {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+@media (max-width: 820px) {
+  .shell {
+    padding: 14px;
+  }
+
+  .headerBand,
+  .contentGrid,
+  .actionRow {
+    display: grid;
+  }
+
+  .contentGrid,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
