@@ -231,3 +231,9 @@ pm.cmd run build termino correctamente.
 - Se actualizo el aviso de version del monitor a `latestVersionCode=6` y `latestVersionName=1.1.4`.
 - El mensaje indica que esta version quita completamente los anuncios de la seccion Novedades.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-09-01 - Aviso version 1.1.5 sin AdMob
+
+- Se actualizo el aviso de version del monitor a `latestVersionCode=7` y `latestVersionName=1.1.5`.
+- El mensaje indica que esta version elimina AdMob de la app y deja solo publicidades propias del panel.
+- Verificacion: `npm.cmd run build` termino correctamente.
