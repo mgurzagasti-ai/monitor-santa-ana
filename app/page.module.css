@@ -356,6 +356,21 @@
   opacity: 0.65;
 }
 
+.secondaryButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0 14px;
+}
+
 .editorHint {
   margin: 0;
   color: var(--muted);
@@ -542,6 +557,104 @@
   width: 100vw;
   height: 100vh;
   z-index: 0;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.42);
+  z-index: 900;
+}
+
+.confirmationModal {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.24);
+  padding: 16px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.modalHeader button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-strong);
+  cursor: pointer;
+}
+
+.confirmationDetails {
+  display: grid;
+  gap: 12px;
+}
+
+.confirmationDetails p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.confirmationDetails dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.confirmationDetails dl div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  min-height: 38px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.confirmationDetails dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.confirmationDetails dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.modalActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 @keyframes spin {

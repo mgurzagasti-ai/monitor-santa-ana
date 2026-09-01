@@ -28,6 +28,20 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Falta linea asignada" }, { status: 400 });
     }
 
+    const assignments = await readAssignments();
+    const duplicatedAssignment = assignments.find(
+      (assignment) =>
+        assignment.deviceId !== deviceId &&
+        sameInternalNumber(assignment.internalNumber, internalNumber)
+    );
+
+    if (duplicatedAssignment) {
+      return NextResponse.json(
+        { error: `El interno ${internalNumber} ya esta asignado a ${duplicatedAssignment.label}` },
+        { status: 409 }
+      );
+    }
+
     const assignment = await upsertAssignment({
       deviceId,
       internalNumber,
@@ -43,4 +57,8 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function sameInternalNumber(current: string, next: string) {
+  return current.trim().toLowerCase() === next.trim().toLowerCase();
 }

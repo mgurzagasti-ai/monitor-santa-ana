@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertAssignment } from "@/app/data/assignments";
+import { readAssignments, upsertAssignment } from "@/app/data/assignments";
 import { upsertFleetDevice } from "@/app/data/fleetDevices";
 import { invalidateFleetCache } from "@/app/data/fleet";
 import { fetchTraccarDevices, getConfig } from "@/app/api/traccar";
@@ -47,6 +47,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Linea no encontrada" }, { status: 400 });
     }
 
+    const assignments = await readAssignments();
+    const duplicatedAssignment = assignments.find(
+      (assignment) =>
+        assignment.deviceId !== deviceId &&
+        sameInternalNumber(assignment.internalNumber, internalNumber)
+    );
+
+    if (duplicatedAssignment) {
+      return NextResponse.json(
+        { error: `El interno ${internalNumber} ya esta asignado a ${duplicatedAssignment.label}` },
+        { status: 409 }
+      );
+    }
+
     const config = getConfig();
     const label = `Colectivo ${internalNumber}`;
     const device = await upsertFleetDevice(
@@ -74,4 +88,8 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function sameInternalNumber(current: string, next: string) {
+  return current.trim().toLowerCase() === next.trim().toLowerCase();
 }
