@@ -237,3 +237,9 @@ pm.cmd run build termino correctamente.
 - Se actualizo el aviso de version del monitor a `latestVersionCode=7` y `latestVersionName=1.1.5`.
 - El mensaje indica que esta version elimina AdMob de la app y deja solo publicidades propias del panel.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-09-01 - Aviso version 1.1.6 sin banners en Novedades
+
+- Se actualizo en produccion `/api/public/app-version` a `latestVersionCode=8` y `latestVersionName=1.1.6` usando `/api/admin/app-version`.
+- El mensaje indica que Novedades queda sin ningun banner publicitario.
+- Verificacion: `npm.cmd run build` termino correctamente.
