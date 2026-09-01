@@ -172,3 +172,35 @@ pm.cmd run build termino correctamente.
 - Verificacion: 
 pm.cmd run build termino correctamente.
 
+
+## 2026-08-31 - Produccion publicidad y prueba interna Android
+
+- Se corrigio el scroll de /admin/ads cambiando el overflow global de body/html: queda bloqueado solo el eje horizontal con `overflow-x: hidden`.
+- Commit/push monitor web: `be2ed25 Fix admin ads page scrolling` en `origin/main`; Vercel desplego produccion correctamente.
+- Se configuro Vercel Storage para publicidades:
+  - Upstash Redis Free creado como `monitor-santa-ana-ads-data` para metadatos de publicaciones.
+  - Blob privado existente `monitor-santa-ana-blob` no sirve para banners publicos porque no permite `access: "public"`.
+  - Blob publico nuevo creado como `monitor-santa-ana-ads-public-blo...` con prefijo de variables `ADS_BLOB`.
+- Se ajusto /api/admin/ads/images para subir al Blob publico indicando `storeId: process.env.ADS_BLOB_STORE_ID`.
+- Commit/push monitor web: `1783ff2 Use public Blob store for ad images` en `origin/main`.
+- Variables esperadas en Vercel para publicidad:
+  - `BLOB_READ_WRITE_TOKEN` para compatibilidad si se usa el store por defecto.
+  - `ADS_BLOB_STORE_ID` y token read-write asociado para el Blob publico nuevo.
+  - `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` para Redis.
+- Se creo la app en Google Play Console con nombre `Santa Ana Bus` y paquete `ar.com.santaana.bus` porque `com.bustracker` ya estaba en uso fuera de esta cuenta.
+- Proyecto Android en `E:\AppColectivos\BusTracker_Android`: se cambio `applicationId` a `ar.com.santaana.bus`, manteniendo `namespace = "com.bustracker"`.
+- Version Android actual para Play: `versionCode = 3`, `versionName = "1.1.1"`.
+- Se corrigio la firma release: `play-signing.properties` tenia BOM al inicio y la ruta del keystore usaba backslash no escapado. Se quito el BOM y se cambio `storeFile` a `distribution-signing/santa-ana-upload-20260830.jks`.
+- `./gradlew.bat signingReport` confirma release con `Config: playRelease`, alias `santa-ana-upload`, certificado valido hasta 2054-01-15.
+- AAB firmado generado correctamente en `E:\AppColectivos\BusTracker_Android\app\build\outputs\bundle\release\app-release.aab`.
+- Google Play Console acepto el AAB firmado en Prueba interna; quedo `Activo`, version mas reciente `3 (1.1.1)`, disponible para verificadores internos y sin revisar.
+- Advertencias vistas en Play: falta archivo de ofuscacion y simbolos de depuracion nativos; son advertencias, no bloquearon la prueba interna.
+- Pendiente recomendado: abrir la pestaña `Verificadores`, copiar el enlace de prueba interna, aceptar como tester con el Gmail agregado e instalar desde Google Play. Luego completar la configuracion requerida de ficha/politicas antes de solicitar produccion.
+
+## 2026-09-01 - API publica de version APK
+
+- Se agrego `/api/public/app-version` para que la APK consulte la ultima version disponible.
+- Nuevo modelo `app/data/appVersion.ts` con valores iniciales `latestVersionCode=4` y `latestVersionName=1.1.2`.
+- La respuesta incluye titulo, mensaje, URL de Google Play, flag `required` y `updatedAt`.
+- Se puede ajustar desde variables de entorno en Vercel: `PUBLIC_APP_LATEST_VERSION_CODE`, `PUBLIC_APP_LATEST_VERSION_NAME`, `PUBLIC_APP_VERSION_TITLE`, `PUBLIC_APP_VERSION_MESSAGE`, `PUBLIC_APP_PLAY_STORE_URL`, `PUBLIC_APP_PACKAGE_ID`, `PUBLIC_APP_UPDATE_REQUIRED`.
+- Verificacion: `npm.cmd run build` termino correctamente y listo `/api/public/app-version`.
