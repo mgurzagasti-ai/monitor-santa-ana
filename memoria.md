@@ -218,3 +218,10 @@ pm.cmd run build termino correctamente.
 
 - Se corrigio el nombre visible de `NEWS_BOTTOM` en el panel de publicidades para que aparezca como `Novedades`.
 - `MAIN_BOTTOM` ahora se muestra como `Inicio` para evitar dos botones llamados Principal en Ubicaciones.
+
+## 2026-09-01 - Credenciales admin para version APK
+
+- `/admin/app-version` y `/api/admin/app-version` ahora validan usuario y contrasena por Basic Auth.
+- Usuario local configurado en `.env.local`: `APP_VERSION_ADMIN_USER=admin`.
+- La contrasena queda en `.env.local` y debe configurarse tambien como variable de entorno en Vercel; no repetirla en memoria ni codigo fuente.
+- Si no hay variables especificas de version, mantiene fallback a `ADS_ADMIN_PASSWORD` o `MONITOR_OPERATOR_PASSWORD`.
