@@ -310,10 +310,14 @@ function isValidAdPublication(value: AdPublication) {
 
 function placementName(code: AdPlacementCode) {
   switch (code) {
+    case "MAIN_BOTTOM":
+      return "Inicio";
     case "LINES_BOTTOM":
       return "Lineas";
     case "MAP_BOTTOM":
       return "Mapa";
+    case "NEWS_BOTTOM":
+      return "Novedades";
     case "FAVORITES_BOTTOM":
       return "Favoritos";
     case "PROFILE_BOTTOM":

@@ -213,3 +213,8 @@ pm.cmd run build termino correctamente.
 - La version publicada por defecto queda `latestVersionCode=5`, `latestVersionName=1.1.3`, con mensaje indicando que quita publicidades externas de Novedades.
 - Se agrego `NEWS_BOTTOM` como ubicacion de publicidad administrable y se mantiene compatibilidad de tipo con `FAVORITES_BOTTOM` viejo.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-09-01 - Etiqueta Novedades en ubicaciones de publicidad
+
+- Se corrigio el nombre visible de `NEWS_BOTTOM` en el panel de publicidades para que aparezca como `Novedades`.
+- `MAIN_BOTTOM` ahora se muestra como `Inicio` para evitar dos botones llamados Principal en Ubicaciones.
