@@ -12,8 +12,8 @@ export type PublicAppVersion = {
   updatedAt: string;
 };
 
-const DEFAULT_VERSION_CODE = 5;
-const DEFAULT_VERSION_NAME = "1.1.3";
+const DEFAULT_VERSION_CODE = 6;
+const DEFAULT_VERSION_NAME = "1.1.4";
 const DEFAULT_PACKAGE_ID = "ar.com.santaana.bus";
 const appVersionFilePath = path.join(process.cwd(), "app", "data", "appVersion.json");
 const appVersionRedisKey = "app_version_v1";

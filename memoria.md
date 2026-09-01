@@ -225,3 +225,9 @@ pm.cmd run build termino correctamente.
 - Usuario local configurado en `.env.local`: `APP_VERSION_ADMIN_USER=admin`.
 - La contrasena queda en `.env.local` y debe configurarse tambien como variable de entorno en Vercel; no repetirla en memoria ni codigo fuente.
 - Si no hay variables especificas de version, mantiene fallback a `ADS_ADMIN_PASSWORD` o `MONITOR_OPERATOR_PASSWORD`.
+
+## 2026-09-01 - Aviso version 1.1.4
+
+- Se actualizo el aviso de version del monitor a `latestVersionCode=6` y `latestVersionName=1.1.4`.
+- El mensaje indica que esta version quita completamente los anuncios de la seccion Novedades.
+- Verificacion: `npm.cmd run build` termino correctamente.
