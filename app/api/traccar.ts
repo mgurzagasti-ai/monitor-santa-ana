@@ -2,6 +2,8 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { readEnvFleetDevices, type FleetDevice } from "@/app/data/fleetDevices";
 
+const traccarFetchTimeoutMs = 6000;
+
 
 export type TraccarPosition = {
   deviceId: number;
@@ -90,7 +92,8 @@ async function fetchTraccarJson<T>(path: string): Promise<T> {
       Accept: "application/json",
       Authorization: `Basic ${Buffer.from(`${config.email}:${config.password}`).toString("base64")}`
     },
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(traccarFetchTimeoutMs)
   });
 
   const body = await response.text();
