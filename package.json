@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node scripts/next-free-port.mjs dev",
     "build": "next build",
-    "start": "node scripts/next-free-port.mjs start"
+    "start": "node scripts/next-free-port.mjs start",
+    "test": "node --test --experimental-strip-types tests/*.test.ts"
   },
   "dependencies": {
     "@types/leaflet": "1.9.20",
