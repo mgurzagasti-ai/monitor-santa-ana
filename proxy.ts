@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const protectedPaths = ["/", "/api/fleet", "/api/assignments", "/api/line-stops"];
 const adsAdminPaths = ["/admin/ads", "/api/admin/ads"];
-const appVersionAdminPaths = ["/admin/app-version", "/api/admin/app-version"];
+const appVersionAdminPaths = ["/admin/app-version", "/api/admin/app-version", "/api/admin/route-geometry"];
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -70,6 +70,8 @@ export const config = {
     "/admin/app-version",
     "/admin/app-version/:path*",
     "/api/admin/app-version",
-    "/api/admin/app-version/:path*"
+    "/api/admin/app-version/:path*",
+    "/api/admin/route-geometry",
+    "/api/admin/route-geometry/:path*"
   ]
 };
