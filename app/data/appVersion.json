@@ -1,9 +1,9 @@
 {
-  "latestVersionCode": 7,
-  "latestVersionName": "1.1.5",
+  "latestVersionCode": 9,
+  "latestVersionName": "1.1.7",
   "title": "Nueva version disponible",
-  "message": "Ya podes actualizar Colectivos Jujuy a la version 1.1.5 desde Google Play. Esta version elimina AdMob de la app y deja solo publicidades propias del panel.",
+  "message": "Ya podes actualizar Colectivos Jujuy a la version 1.1.7 desde Google Play. Esta version mantiene las publicidades propias del panel y elimina AdMob.",
   "playStoreUrl": "https://play.google.com/store/apps/details?id=ar.com.santaana.bus",
   "required": false,
-  "updatedAt": "2026-09-01T13:25:00.000Z"
+  "updatedAt": "2026-09-01T14:15:00.000Z"
 }

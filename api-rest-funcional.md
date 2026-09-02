@@ -77,7 +77,7 @@ Tambien ya esta configurado:
 - Upstash Redis para cachear flota por `FLEET_CACHE_TTL_SECONDS`.
 - Seguridad del monitor con `MONITOR_OPERATOR_PASSWORD`.
 - APK apuntando a `https://monitor-santa-ana.vercel.app`.
-- Refresco de la APK cada 60 segundos para reducir carga.
+- Refresco de la APK cada 30 segundos para reducir carga.
 
 ## Pendientes para robustez con muchos usuarios
 
