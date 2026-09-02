@@ -13,17 +13,28 @@ export async function GET(request: NextRequest) {
         {
           status: 429,
           headers: {
-            "Retry-After": String(rateLimit.retryAfterSeconds)
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "Cache-Control": "private, no-store"
           }
         }
       );
     }
 
-    return NextResponse.json(await getFleetSnapshot());
+    return NextResponse.json(await getFleetSnapshot(), {
+      headers: {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Vercel-CDN-Cache-Control": "public, s-maxage=5, stale-while-revalidate=25"
+      }
+    });
   } catch (error) {
     return NextResponse.json(
       { vehicles: [], updatedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Error" },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "private, no-store"
+        }
+      }
     );
   }
 }
