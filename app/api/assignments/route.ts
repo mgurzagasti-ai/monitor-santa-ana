@@ -17,14 +17,19 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<VehicleAssignment>;
     const deviceId = Number(body.deviceId);
-    const internalNumber = String(body.internalNumber ?? "").trim();
-    const assignedLineId = String(body.assignedLineId ?? "").trim();
-    const label = String(body.label ?? `Colectivo ${internalNumber}`).trim();
-    const operationalStatus = normalizeOperationalStatus(body.operationalStatus);
 
     if (!Number.isFinite(deviceId) || deviceId <= 0) {
       return NextResponse.json({ error: "deviceId invalido" }, { status: 400 });
     }
+
+    const assignments = await readAssignments();
+    const currentAssignment = assignments.find((assignment) => assignment.deviceId === deviceId);
+    const internalNumber = String(body.internalNumber ?? currentAssignment?.internalNumber ?? "").trim();
+    const assignedLineId = String(body.assignedLineId ?? currentAssignment?.assignedLineId ?? "").trim();
+    const label = String(body.label ?? currentAssignment?.label ?? `Colectivo ${internalNumber}`).trim();
+    const operationalStatus = body.operationalStatus === undefined
+      ? currentAssignment?.operationalStatus ?? "EN_SERVICIO"
+      : normalizeOperationalStatus(body.operationalStatus);
 
     if (!internalNumber) {
       return NextResponse.json({ error: "Falta interno" }, { status: 400 });
@@ -34,18 +39,20 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Falta linea asignada" }, { status: 400 });
     }
 
-    const assignments = await readAssignments();
-    const duplicatedAssignment = assignments.find(
-      (assignment) =>
-        assignment.deviceId !== deviceId &&
-        sameInternalNumber(assignment.internalNumber, internalNumber)
-    );
-
-    if (duplicatedAssignment) {
-      return NextResponse.json(
-        { error: `El interno ${internalNumber} ya esta asignado a ${duplicatedAssignment.label}` },
-        { status: 409 }
+    const internalNumberChanged = !currentAssignment || !sameInternalNumber(currentAssignment.internalNumber, internalNumber);
+    if (internalNumberChanged) {
+      const duplicatedAssignment = assignments.find(
+        (assignment) =>
+          assignment.deviceId !== deviceId &&
+          sameInternalNumber(assignment.internalNumber, internalNumber)
       );
+
+      if (duplicatedAssignment) {
+        return NextResponse.json(
+          { error: `El interno ${internalNumber} ya esta asignado a ${duplicatedAssignment.label}` },
+          { status: 409 }
+        );
+      }
     }
 
     const assignment = await upsertAssignment({

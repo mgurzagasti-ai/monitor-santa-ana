@@ -114,7 +114,6 @@ type AssignmentConfirmation = {
   deviceId: number;
   internalNumber: string;
   assignedLineId: string;
-  previousInternalNumber: string;
   previousLineLabel: string;
   nextLineLabel: string;
 };
@@ -126,7 +125,6 @@ type DeviceConfirmation = {
   uniqueId: string;
   internalNumber: string;
   assignedLineId: string;
-  nextLineLabel: string;
 };
 
 type PendingConfirmation = AssignmentConfirmation | DeviceConfirmation;
@@ -148,7 +146,6 @@ export default function Home() {
   const [stopMessage, setStopMessage] = useState("");
   const [selectedLineRouteIds, setSelectedLineRouteIds] = useState<string[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
-  const [internalDraft, setInternalDraft] = useState("");
   const [assignmentMessage, setAssignmentMessage] = useState("");
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [stopDraft, setStopDraft] = useState<StopDraft>({
@@ -200,6 +197,8 @@ export default function Home() {
     if (!selectedVehicle) return null;
     return assignments.find((assignment) => assignment.deviceId === selectedVehicle.deviceId) ?? null;
   }, [assignments, selectedVehicle]);
+
+  const selectedRegisteredInternalNumber = selectedVehicle?.internalNumber || selectedAssignment?.internalNumber || "";
 
   const selectedStopLine = useMemo(() => {
     return lineRoutes.find((line) => line.id === stopDraft.lineId) ?? lineRoutesWithPaths[0] ?? null;
@@ -324,12 +323,12 @@ export default function Home() {
     }
   }
 
-  function requestSaveAssignment(nextLineId: string, nextInternalNumber = internalDraft) {
+  function requestSaveAssignment(nextLineId: string) {
     if (!selectedVehicle) return;
 
-    const internalNumber = nextInternalNumber.trim() || selectedVehicle.internalNumber || selectedAssignment?.internalNumber || "";
+    const internalNumber = selectedRegisteredInternalNumber;
     if (!internalNumber) {
-      setAssignmentMessage("Falta interno.");
+      setAssignmentMessage("Primero registra el GPS y el interno.");
       return;
     }
 
@@ -338,16 +337,9 @@ export default function Home() {
       return;
     }
 
-    const currentInternalNumber = selectedVehicle.internalNumber ?? selectedAssignment?.internalNumber ?? "";
     const currentLineId = selectedVehicle.assignedLineId ?? selectedAssignment?.assignedLineId ?? "";
-    if (sameInternalNumber(currentInternalNumber, internalNumber) && currentLineId === nextLineId) {
+    if (currentLineId === nextLineId) {
       setAssignmentMessage("");
-      return;
-    }
-
-    const duplicatedVehicle = findInternalNumberConflict(internalNumber, selectedVehicle.deviceId, assignments, fleet.vehicles);
-    if (duplicatedVehicle) {
-      setAssignmentMessage(`El interno ${internalNumber} ya esta asignado a ${duplicatedVehicle.label}.`);
       return;
     }
 
@@ -357,7 +349,6 @@ export default function Home() {
       deviceId: selectedVehicle.deviceId,
       internalNumber,
       assignedLineId: nextLineId,
-      previousInternalNumber: currentInternalNumber || "-",
       previousLineLabel: formatLineById(lineRoutesWithPaths, currentLineId),
       nextLineLabel: formatLineById(lineRoutesWithPaths, nextLineId)
     });
@@ -366,56 +357,29 @@ export default function Home() {
   async function saveAssignment(confirmation: AssignmentConfirmation) {
     if (!selectedVehicle || selectedVehicle.deviceId !== confirmation.deviceId) return;
 
-    const internalNumber = confirmation.internalNumber;
     const nextLineId = confirmation.assignedLineId;
-    const operationalStatus = selectedVehicle.operationalStatus ?? selectedAssignment?.operationalStatus ?? "EN_SERVICIO";
 
     setSavingAssignment(true);
     try {
+      const response = await fetch("/api/assignments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: selectedVehicle.deviceId,
+          assignedLineId: nextLineId
+        })
+      });
+
+      const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar la asignacion");
+      if (data.assignments) {
+        setAssignments(data.assignments);
+      }
+
       const monitorDevices = readMonitorDevices();
       const monitorDevice = monitorDevices.find((device) => device.deviceId === selectedVehicle.deviceId);
-
       if (monitorDevice) {
-        const nextMonitorDevice = {
-          ...monitorDevice,
-          internalNumber,
-          assignedLineId: nextLineId,
-          operationalStatus
-        };
-        const response = await fetch("/api/devices", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(nextMonitorDevice)
-        });
-        const data = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el GPS");
-
-        const nextDevices = upsertMonitorDevice(nextMonitorDevice);
-        setAssignments(nextDevices.map((device) => ({
-          deviceId: device.deviceId,
-          internalNumber: device.internalNumber,
-          label: `Colectivo ${device.internalNumber}`,
-          assignedLineId: device.assignedLineId,
-          operationalStatus: normalizeOperationalStatus(device.operationalStatus)
-        })));
-      } else {
-        const response = await fetch("/api/assignments", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceId: selectedVehicle.deviceId,
-            internalNumber,
-            label: `Colectivo ${internalNumber}`,
-            assignedLineId: nextLineId,
-            operationalStatus
-          })
-        });
-
-        const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
-        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar la asignacion");
-        if (data.assignments) {
-          setAssignments(data.assignments);
-        }
+        upsertMonitorDevice({ ...monitorDevice, assignedLineId: nextLineId });
       }
 
       setAssignmentMessage("Asignacion guardada.");
@@ -430,51 +394,24 @@ export default function Home() {
   async function saveOperationalStatus(operationalStatus: OperationalStatus) {
     if (!selectedVehicle) return;
 
-    const internalNumber = selectedVehicle.internalNumber || selectedAssignment?.internalNumber || "";
-    const assignedLineId = selectedVehicle.assignedLineId || selectedAssignment?.assignedLineId || "";
-    if (!internalNumber || !assignedLineId) {
-      setAssignmentMessage("Falta interno o linea asignada.");
-      return;
-    }
-
     setSavingAssignment(true);
     try {
+      const response = await fetch("/api/assignments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: selectedVehicle.deviceId,
+          operationalStatus
+        })
+      });
+      const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el estado");
+      if (data.assignments) setAssignments(data.assignments);
+
       const monitorDevices = readMonitorDevices();
       const monitorDevice = monitorDevices.find((device) => device.deviceId === selectedVehicle.deviceId);
-
       if (monitorDevice) {
-        const nextMonitorDevice = { ...monitorDevice, operationalStatus };
-        const response = await fetch("/api/devices", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(nextMonitorDevice)
-        });
-        const data = (await response.json()) as { error?: string };
-        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el estado");
-
-        const nextDevices = upsertMonitorDevice(nextMonitorDevice);
-        setAssignments(nextDevices.map((device) => ({
-          deviceId: device.deviceId,
-          internalNumber: device.internalNumber,
-          label: `Colectivo ${device.internalNumber}`,
-          assignedLineId: device.assignedLineId,
-          operationalStatus: normalizeOperationalStatus(device.operationalStatus)
-        })));
-      } else {
-        const response = await fetch("/api/assignments", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceId: selectedVehicle.deviceId,
-            internalNumber,
-            label: selectedAssignment?.label || selectedVehicle.label || `Colectivo ${internalNumber}`,
-            assignedLineId,
-            operationalStatus
-          })
-        });
-        const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
-        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el estado");
-        if (data.assignments) setAssignments(data.assignments);
+        upsertMonitorDevice({ ...monitorDevice, operationalStatus });
       }
 
       setFleet((current) => ({
@@ -580,7 +517,7 @@ export default function Home() {
     const assignedLineId = selectedVehicle?.assignedLineId || selectedLineRouteIds[0] || lineRoutesWithPaths[0]?.id || "";
     setDeviceDraft((current) => ({ ...current, assignedLineId: current.assignedLineId || assignedLineId }));
     setDeviceManagerOpen(true);
-    setDeviceMessage("Selecciona un GPS de Traccar, carga el interno y asigna la linea.");
+    setDeviceMessage("Selecciona un GPS de Traccar y carga el interno.");
     loadTraccarDevices();
   }
 
@@ -592,10 +529,15 @@ export default function Home() {
   function requestSaveMonitorDevice() {
     const traccarDevice = traccarDevices.find((device) => String(device.id) === deviceDraft.deviceId);
     const internalNumber = deviceDraft.internalNumber.trim();
-    const assignedLineId = deviceDraft.assignedLineId;
+    const assignedLineId = selectedVehicle?.assignedLineId || selectedAssignment?.assignedLineId || deviceDraft.assignedLineId || lineRoutesWithPaths[0]?.id || "";
 
-    if (!traccarDevice || !internalNumber || !assignedLineId) {
-      setDeviceMessage("Falta GPS, interno o linea.");
+    if (!traccarDevice || !internalNumber) {
+      setDeviceMessage("Falta GPS o interno.");
+      return;
+    }
+
+    if (!assignedLineId) {
+      setDeviceMessage("Primero tiene que cargar un recorrido de linea.");
       return;
     }
 
@@ -612,8 +554,7 @@ export default function Home() {
       gpsLabel: traccarDevice.name,
       uniqueId: traccarDevice.uniqueId,
       internalNumber,
-      assignedLineId,
-      nextLineLabel: formatLineById(lineRoutesWithPaths, assignedLineId)
+      assignedLineId
     });
   }
 
@@ -685,10 +626,6 @@ export default function Home() {
     const initialLineId = selectedVehicle?.assignedLineId || selectedLineRouteIds[0] || lineRoutesWithPaths[0].id;
     setStopDraft((current) => ({ ...current, lineId: initialLineId }));
   }, [lineRoutesWithPaths, selectedLineRouteIds, selectedVehicle?.assignedLineId, stopDraft.lineId]);
-
-  useEffect(() => {
-    setInternalDraft(selectedVehicle?.internalNumber ?? selectedAssignment?.internalNumber ?? "");
-  }, [selectedVehicle?.internalNumber, selectedVehicle?.deviceId, selectedAssignment?.internalNumber]);
 
   useEffect(() => {
     const assignedLineId = selectedVehicle?.assignedLineId ?? selectedAssignment?.assignedLineId;
@@ -771,8 +708,8 @@ export default function Home() {
         {deviceManagerOpen ? (
           <section className={styles.assignmentPanel}>
             <div className={styles.sectionHeader}>
-              <span>Cargar GPS</span>
-              <small>{savingDevice ? "Guardando" : "Traccar"}</small>
+              <span>GPS / Internos</span>
+              <small>{savingDevice ? "Guardando" : "Alta inicial"}</small>
             </div>
             <label className={styles.field}>
               <span>GPS</span>
@@ -796,43 +733,20 @@ export default function Home() {
                 placeholder="705"
               />
             </label>
-            <label className={styles.field}>
-              <span>Linea</span>
-              <select
-                value={deviceDraft.assignedLineId}
-                onChange={(event) => setDeviceDraft((current) => ({ ...current, assignedLineId: event.target.value }))}
-              >
-                <option value="">Seleccionar linea</option>
-                {lineRoutesWithPaths.map((line) => (
-                  <option key={line.id} value={line.id}>
-                    {formatLineLabel(line)}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button className={styles.primaryButton} onClick={requestSaveMonitorDevice} disabled={savingDevice}>
               <Save size={17} />
-              <span>Guardar GPS</span>
+              <span>Guardar interno</span>
             </button>
             {deviceMessage ? <p className={styles.editorHint}>{deviceMessage}</p> : null}
           </section>
         ) : null}
 
-        {selectedVehicle ? (
+        {selectedVehicle && selectedRegisteredInternalNumber ? (
           <section className={styles.assignmentPanel}>
             <div className={styles.sectionHeader}>
-              <span>Asignacion</span>
-              <small>{savingAssignment ? "Guardando" : "Actual"}</small>
+              <span>Operacion de unidades</span>
+              <small>{savingAssignment ? "Guardando" : `Interno ${selectedRegisteredInternalNumber || "-"}`}</small>
             </div>
-            <label className={styles.field}>
-              <span>Interno</span>
-              <input
-                value={internalDraft}
-                onChange={(event) => setInternalDraft(event.target.value)}
-                onBlur={() => requestSaveAssignment(selectedVehicle.assignedLineId ?? selectedAssignment?.assignedLineId ?? "49bis")}
-                placeholder="230"
-              />
-            </label>
             <label className={styles.field}>
               <span>Linea</span>
               <select
@@ -1044,11 +958,7 @@ export default function Home() {
                   <p>Vas a actualizar la asignacion del colectivo seleccionado.</p>
                   <dl>
                     <div>
-                      <dt>Interno actual</dt>
-                      <dd>{pendingConfirmation.previousInternalNumber}</dd>
-                    </div>
-                    <div>
-                      <dt>Nuevo interno</dt>
+                      <dt>Interno</dt>
                       <dd>{pendingConfirmation.internalNumber}</dd>
                     </div>
                     <div>
@@ -1063,7 +973,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <p>Vas a cargar este GPS para el monitor y la APK.</p>
+                  <p>Vas a asociar este GPS con un interno.</p>
                   <dl>
                     <div>
                       <dt>GPS</dt>
@@ -1072,10 +982,6 @@ export default function Home() {
                     <div>
                       <dt>Interno</dt>
                       <dd>{pendingConfirmation.internalNumber}</dd>
-                    </div>
-                    <div>
-                      <dt>Linea</dt>
-                      <dd>{pendingConfirmation.nextLineLabel}</dd>
                     </div>
                   </dl>
                 </>
