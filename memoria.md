@@ -463,3 +463,15 @@ pm.cmd run build termino correctamente.
   - `EtaEstimate`.
 - Luego debera aplicar cache/CDN apropiado.
 - Todavia no implementar ese endpoint.
+
+## 2026-09-03 - ETA etapas 4 y 5, APK 1.1.9 y rate limit fleet
+
+- ETA Etapa 4 terminada: endpoint publico `/api/public/stop-arrivals` implementado.
+- ETA Etapa 5 terminada: integracion Android completada.
+- APK actual instalada/probada: `versionName=1.1.9`, `versionCode=11`.
+- Correccion `/api/public/fleet`: rate limit aumentado a `60000` requests por `60` segundos por IP.
+- Correccion `/api/public/fleet`: si no hay IP confiable, no se usa `"unknown"`; se devuelve `null` y queda fail-open.
+- Commit backend de la correccion de rate limit fleet: `62bd6a1 Increase fleet rate limit for shared IPs`.
+- Prueba real: `/api/public/fleet` y APK funcionan con Wi-Fi.
+- Panel de parada/ETA probado en APK.
+- Proximo paso: cargar paradas reales y validar ETA con colectivos circulando.
