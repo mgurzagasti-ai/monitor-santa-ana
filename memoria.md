@@ -243,3 +243,223 @@ pm.cmd run build termino correctamente.
 - Se actualizo en produccion `/api/public/app-version` a `latestVersionCode=8` y `latestVersionName=1.1.6` usando `/api/admin/app-version`.
 - El mensaje indica que Novedades queda sin ningun banner publicitario.
 - Verificacion: `npm.cmd run build` termino correctamente.
+
+## 2026-09-02 - Estado backend ETA hasta Etapa 3
+
+### Etapa 1 - Geometria y paradas
+
+- Estado: terminada y desplegada.
+- Commit principal: `3415d24 Add route geometry and stop projections`.
+- Archivos principales:
+  - `app/data/routeGeometry.ts`
+  - `app/data/stopProjections.ts`
+- Se cargo geometria IDA/VUELTA desde KML.
+- La geometria incluye `cumulativeDistanceMeters`.
+- Se implemento `projectPointOntoRoute()`.
+- Se implemento proyeccion de paradas sobre el recorrido.
+- El diagnostico expone `lineGeometryReady` y `stopEtaReady`.
+- Distancia maxima actual para considerar una parada sobre recorrido: `maxDistanceFromRouteMeters = 100`.
+- Se usa cache en memoria y Redis.
+- Endpoint diagnostico: `/api/admin/route-geometry`.
+- La direccion IDA/VUELTA se determina por nombre de `Placemark`, no por el orden de los `LineString` del KML.
+- Los KML no deben descargarse en el futuro hot path de usuarios.
+- Proteccion del endpoint:
+  - Commit: `3724c42 Protect route geometry admin endpoint`.
+  - Sin autenticacion responde `401`.
+  - Con autenticacion administrativa responde `200`.
+  - No registrar credenciales Basic Auth en `memoria.md`.
+- Piloto validado: `2-peron`.
+  - Geometria IDA: aproximadamente `14165 m`.
+  - Geometria VUELTA: aproximadamente `16280 m`.
+  - Parada piloto: `2-peron-a12d14c1`.
+  - `direction = ida`.
+  - `stopMeasureMeters` aproximadamente `14165`.
+  - `distanceFromRouteMeters` aproximadamente `75`.
+  - `projectionValid = true`.
+  - `stopEtaReady = true`.
+  - Diagnostico: `order_missing`.
+  - Se verifico que la parada esta realmente cerca del final del recorrido IDA y que `projectPointOntoRoute()` actuo correctamente al proyectarla contra el extremo final del recorrido.
+
+### Etapa 2 - Proyeccion del vehiculo
+
+- Estado: terminada y desplegada.
+- Commit: `9b2e6d9 Add vehicle route projection and stop state logic`.
+- Archivo principal: `app/data/vehicleRouteProjection.ts`.
+- Se implemento proyeccion del vehiculo sobre IDA/VUELTA.
+- Reutiliza `projectPointOntoRoute()`.
+- Se implemento deteccion de direccion.
+- Calcula `vehicleMeasureMeters`.
+- Calcula `distanceRemainingMeters`.
+- Estados actuales:
+  - `approaching`
+  - `arriving`
+  - `passed`
+  - `no_prediction`
+- Constantes actuales:
+  - `MAX_VEHICLE_DISTANCE_FROM_ROUTE_METERS = 100`
+  - `AMBIGUOUS_ROUTE_DISTANCE_DIFFERENCE_METERS = 30`
+  - `COURSE_COMPATIBILITY_DEGREES = 60`
+  - `ARRIVING_BEFORE_METERS = 80`
+  - `PASSED_AFTER_METERS = 40`
+- Seleccion de direccion:
+  - si solamente una geometria esta dentro de `100 m`, usarla;
+  - si ambas estan dentro de `100 m` pero una es claramente mas cercana por `>=30 m`, usar la mas cercana;
+  - si estan geometricamente ambiguas, utilizar `course`;
+  - la diferencia angular se calcula correctamente incluyendo cruce `0/360`;
+  - `course` compatible es `<=60` grados;
+  - si no puede determinar direccion con seguridad, devuelve `no_prediction`.
+- La logica no consulta Traccar directamente.
+- La logica no hace HTTP.
+- No llama `getFleetSnapshot()` dentro de la funcion pura.
+- La logica no modifica el fleet snapshot.
+- No modifica `fleet.ts`.
+- No modifica `/api/public/fleet`.
+- No altera anti-stampede.
+- Ante direccion ambigua prefiere `no_prediction`.
+- Tests acumulados despues de Etapa 2: `24`.
+
+### Etapa 3 - ETA V1
+
+- Estado: implementada y con commit local, todavia sin push/deploy.
+- Commit local: `b4cd78a Add ETA V1 estimation logic`.
+- Archivos:
+  - `app/data/etaEstimate.ts`
+  - `tests/etaEstimate.test.ts`
+- Objetivo: convertir el estado de Etapa 2 y `distanceRemainingMeters` en una estimacion inicial de minutos.
+- ETA V1 todavia no usa:
+  - historicos;
+  - trafico;
+  - machine learning;
+  - velocidad historica por tramo;
+  - Redis ETA;
+  - CDN ETA.
+- Constantes actuales:
+  - `MIN_USABLE_SPEED_KMH = 5`
+  - `MAX_USABLE_SPEED_KMH = 60`
+  - `DEFAULT_URBAN_SPEED_KMH = 15`
+  - `MAX_POSITION_AGE_SECONDS = 120`
+- Comportamiento por estado:
+  - `approaching`: calcula ETA.
+  - `arriving`: `etaMinutes = 0`.
+  - `passed`: `etaMinutes = null`.
+  - `no_prediction`: `etaMinutes = null`.
+- Politica de velocidad:
+  - Entre `5` y `60 km/h`: usa velocidad GPS actual.
+  - `null`, `NaN`, `Infinity`, `0` o menor que `5`: fallback a `15 km/h`.
+  - Mayor que `60`: limitada a `60 km/h`.
+- Redondeo:
+  - `distanceKm = distanceRemainingMeters / 1000`.
+  - `etaHours = distanceKm / effectiveSpeedKmh`.
+  - `etaMinutesRaw = etaHours * 60`.
+  - `etaMinutes = max(1, ceil(etaMinutesRaw))`.
+- Politica GPS:
+  - `fixTime` invalido: `etaMinutes = null`, `reason = invalid_fix_time`.
+  - Posicion mayor a `120` segundos: `etaMinutes = null`, `reason = stale_position`.
+  - `currentTime` se recibe explicitamente.
+  - No se usa `Date.now()` interno en la logica pura.
+- Resultado interno incluye conceptualmente:
+  - `etaMinutes`;
+  - `etaMinutesRaw`;
+  - `effectiveSpeedKmh`;
+  - `confidence`;
+  - `reason` interno cuando corresponde.
+- Valores contemplados para `confidence`:
+  - `current_speed`;
+  - `default_speed`;
+  - `arriving`;
+  - `not_available`.
+- Verificacion posterior a Etapa 3:
+  - `npm test`: `45/45` tests pasaron.
+  - `npx tsc --noEmit`: paso.
+  - `npm run build`: paso.
+- No se pudo probar ETA real de `2-peron` porque en el snapshot disponible en ese momento no habia vehiculo de esa linea.
+- No se inventaron datos.
+
+### Produccion actual
+
+- Produccion todavia esta en `9b2e6d9` porque `b4cd78a` no fue pusheado.
+- Vercel esta conectado a GitHub `main` y despliega automaticamente cuando se hace push.
+- Flujo de despliegue:
+  - commit local;
+  - push `origin/main`;
+  - GitHub;
+  - deploy automatico de Vercel.
+- Hacer commit local no despliega; el push a `main` provoca el deploy automatico de Vercel.
+
+### Arquitectura importante
+
+- Flujo actual:
+  - Android APK
+  - Next.js backend en Vercel
+  - CDN / cache
+  - Redis
+  - Traccar en VPS
+- Las credenciales de Traccar permanecen backend-only.
+- Android no se conecta directamente a Traccar.
+- `/api/public/fleet`:
+  - Publico.
+  - Polling Android aproximado cada `30` segundos.
+  - CDN activo.
+  - Snapshot Redis.
+  - Cache interno.
+  - Anti-stampede activo.
+  - Stale snapshot.
+  - Fallback controlado.
+  - Rate limit especifico de fleet actualmente `600/min/IP`.
+- El rate limit de fleet se aumento desde `120/min/IP` porque el limite anterior produjo `429` reales y "Sin conexion con monitor" en Android para IP compartida/CGNAT.
+- No cambiar el contrato publico de `/api/public/fleet` sin revisar compatibilidad con la APK existente.
+
+### Escalabilidad
+
+- Objetivo futuro potencial: decenas de miles de usuarios.
+- Ejemplo de diseno usado:
+  - `50.000` usuarios activos;
+  - poll cada `30` segundos;
+  - aproximadamente `100.000 requests/minuto`;
+  - aproximadamente `1.667 requests/segundo`.
+- La mayoria del trafico debe ser absorbida por CDN.
+- No hacer stress tests fuertes directamente contra produccion sin planificacion.
+
+### Reglas de seguridad
+
+- No exponer publicamente:
+  - IMEI.
+  - `uniqueId`.
+  - `battery`.
+  - `satellites`.
+  - `ignition`.
+  - `power`.
+  - Credenciales Traccar.
+  - Credenciales Redis.
+  - API keys.
+  - Passwords.
+  - Credenciales Basic Auth.
+  - Secrets o `.env`.
+  - Diagnosticos GPS innecesarios.
+- No escribir secretos dentro de `memoria.md`.
+
+### Android
+
+- Android todavia no consume el nuevo backend ETA.
+- La logica actual de ETA Android sigue siendo la anterior hasta una futura actualizacion del APK.
+- Actualmente Android conserva su logica anterior de ETA basada en distancia recta/velocidad.
+- No modificar Android durante las etapas backend salvo autorizacion explicita.
+- Modificar Android requerira posteriormente nueva APK/AAB.
+
+### Proximo paso recomendado
+
+- Despues de aprobar `memoria.md`:
+  - Commit separado de `memoria.md`.
+  - Push controlado.
+  - Vercel desplegara Etapa 3.
+  - Verificar produccion.
+  - Cerrar Etapa 3.
+  - Despues disenar la siguiente etapa del endpoint `/api/public/stop-arrivals`.
+- El futuro endpoint `GET /api/public/stop-arrivals` debera combinar:
+  - fleet snapshot existente;
+  - `RouteGeometry`;
+  - `StopProjection`;
+  - `VehicleRouteProjection`;
+  - `EtaEstimate`.
+- Luego debera aplicar cache/CDN apropiado.
+- Todavia no implementar ese endpoint.
