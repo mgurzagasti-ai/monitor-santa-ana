@@ -475,3 +475,26 @@ pm.cmd run build termino correctamente.
 - Prueba real: `/api/public/fleet` y APK funcionan con Wi-Fi.
 - Panel de parada/ETA probado en APK.
 - Proximo paso: cargar paradas reales y validar ETA con colectivos circulando.
+
+## 2026-09-03 - Estado operativo, monitor reorganizado y verificacion produccion
+
+- APK produccion/prueba actual: `versionName=1.1.9`, `versionCode=11`.
+- ETA por parada implementado y probado.
+- `/api/public/fleet` corregido para CGNAT: `60000` requests por `60` segundos por IP y fail-open cuando no hay IP confiable.
+- Commit de correccion CGNAT fleet: `62bd6a1`.
+- Estado operativo de unidades implementado:
+  - `EN_SERVICIO`;
+  - `FUERA_DE_SERVICIO`;
+  - `TALLER`.
+- Solo las unidades `EN_SERVICIO` aparecen en `/api/public/fleet` y por lo tanto en la APK.
+- Monitor reorganizado:
+  - `GPS / Internos`: relacion estable GPS <-> interno.
+  - `Operacion de unidades`: relacion diaria interno <-> linea <-> estado operativo.
+- Desde `Operacion de unidades` no se modifica GPS ni numero de interno.
+- `PATCH /api/assignments` es parcial y conserva los demas datos cuando no vienen en el request.
+- Se mantiene la proteccion contra internos duplicados.
+- No requiere migracion de datos existentes: los registros sin estado quedan como `EN_SERVICIO` por defecto.
+- Reorganizacion final commit: `af57fea`.
+- Probado en produccion y funcionando correctamente.
+- Publicidad propia: rotacion verificada; los anuncios requieren `imageUrl`.
+- Proximo trabajo: continuar carga de paradas reales y validar ETA en servicio real.
