@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAssignments, upsertAssignment } from "@/app/data/assignments";
+import { normalizeOperationalStatus, readAssignments, upsertAssignment } from "@/app/data/assignments";
 import { upsertFleetDevice } from "@/app/data/fleetDevices";
 import { invalidateFleetCache } from "@/app/data/fleet";
 import { fetchTraccarDevices, getConfig } from "@/app/api/traccar";
@@ -27,12 +27,14 @@ export async function POST(request: NextRequest) {
       name?: unknown;
       internalNumber?: unknown;
       assignedLineId?: unknown;
+      operationalStatus?: unknown;
     };
     const deviceId = Number(body.deviceId);
     const uniqueId = String(body.uniqueId ?? "").trim();
     const name = String(body.name ?? "").trim();
     const internalNumber = String(body.internalNumber ?? "").trim();
     const assignedLineId = String(body.assignedLineId ?? "").trim();
+    const operationalStatus = normalizeOperationalStatus(body.operationalStatus);
     const line = lineRoutes.find((row) => row.id === assignedLineId);
 
     if (!Number.isFinite(deviceId) || deviceId <= 0) {
@@ -77,7 +79,8 @@ export async function POST(request: NextRequest) {
       deviceId,
       internalNumber,
       label,
-      assignedLineId: line.id
+      assignedLineId: line.id,
+      operationalStatus
     });
     await invalidateFleetCache();
 

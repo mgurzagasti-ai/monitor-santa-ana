@@ -7,7 +7,11 @@ export type VehicleAssignment = {
   internalNumber: string;
   label: string;
   assignedLineId: string;
+  operationalStatus: OperationalStatus;
 };
+
+export const operationalStatuses = ["EN_SERVICIO", "FUERA_DE_SERVICIO", "TALLER"] as const;
+export type OperationalStatus = (typeof operationalStatuses)[number];
 
 const assignmentsFile = join(process.cwd(), "app", "data", "vehicleAssignments.json");
 const assignmentsRedisKey = "vehicle_assignments";
@@ -37,8 +41,8 @@ function readLocalAssignments(): VehicleAssignment[] {
   if (!existsSync(assignmentsFile)) return [];
 
   try {
-    const rows = JSON.parse(readFileSync(assignmentsFile, "utf8")) as VehicleAssignment[];
-    return Array.isArray(rows) ? rows.filter(isAssignment) : [];
+    const rows = JSON.parse(readFileSync(assignmentsFile, "utf8")) as Partial<VehicleAssignment>[];
+    return Array.isArray(rows) ? rows.filter(isAssignment).map(normalizeAssignment) : [];
   } catch {
     return [];
   }
@@ -59,8 +63,8 @@ async function readRedisAssignments(): Promise<VehicleAssignment[] | null> {
   if (!response) return [];
 
   try {
-    const rows = JSON.parse(response) as VehicleAssignment[];
-    return Array.isArray(rows) ? rows.filter(isAssignment) : [];
+    const rows = JSON.parse(response) as Partial<VehicleAssignment>[];
+    return Array.isArray(rows) ? rows.filter(isAssignment).map(normalizeAssignment) : [];
   } catch {
     return [];
   }
@@ -71,7 +75,23 @@ async function writeRedisAssignments(assignments: VehicleAssignment[]) {
   await redisCommand(["SET", assignmentsRedisKey, JSON.stringify(assignments)]);
 }
 
-function isAssignment(value: VehicleAssignment) {
+export function normalizeOperationalStatus(value: unknown): OperationalStatus {
+  return operationalStatuses.includes(value as OperationalStatus)
+    ? (value as OperationalStatus)
+    : "EN_SERVICIO";
+}
+
+function normalizeAssignment(value: Partial<VehicleAssignment>): VehicleAssignment {
+  return {
+    deviceId: Number(value.deviceId),
+    internalNumber: value.internalNumber ?? "",
+    label: value.label ?? "",
+    assignedLineId: value.assignedLineId ?? "",
+    operationalStatus: normalizeOperationalStatus(value.operationalStatus)
+  };
+}
+
+function isAssignment(value: Partial<VehicleAssignment>) {
   return (
     Number.isFinite(Number(value.deviceId)) &&
     typeof value.internalNumber === "string" &&

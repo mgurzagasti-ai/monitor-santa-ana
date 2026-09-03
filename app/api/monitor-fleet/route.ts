@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeOperationalStatus, type OperationalStatus } from "@/app/data/assignments";
 import { lineRoutes } from "@/app/data/lineRoutes";
 import { fetchPositions, type TraccarPosition } from "@/app/api/traccar";
 
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
           internalNumber: device.internalNumber,
           assignedLineId: assignedLine?.id ?? device.assignedLineId,
           assignedLineName: assignedLine?.name ?? "",
+          operationalStatus: device.operationalStatus,
           label,
           line: assignedLine?.number ?? "-",
           color: assignedLine?.color ?? "#f57c00",
@@ -51,6 +53,7 @@ type MonitorDevice = {
   deviceId: number;
   internalNumber: string;
   assignedLineId: string;
+  operationalStatus: OperationalStatus;
 };
 
 function parseDevices(value: string | null): MonitorDevice[] {
@@ -58,7 +61,9 @@ function parseDevices(value: string | null): MonitorDevice[] {
   try {
     const rows = JSON.parse(value) as MonitorDevice[];
     return Array.isArray(rows)
-      ? rows.filter((row) => Number.isFinite(Number(row.deviceId)) && row.internalNumber && row.assignedLineId)
+      ? rows
+          .filter((row) => Number.isFinite(Number(row.deviceId)) && row.internalNumber && row.assignedLineId)
+          .map((row) => ({ ...row, operationalStatus: normalizeOperationalStatus(row.operationalStatus) }))
       : [];
   } catch {
     return [];

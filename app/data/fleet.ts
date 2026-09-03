@@ -1,4 +1,4 @@
-import { readAssignments } from "@/app/data/assignments";
+import { readAssignments, type OperationalStatus } from "@/app/data/assignments";
 import { readFleetDevices } from "@/app/data/fleetDevices";
 import { lineRoutes } from "@/app/data/lineRoutes";
 import { isRedisConfigured, redisCommand } from "@/app/data/redis";
@@ -13,6 +13,7 @@ export type FleetVehicle = {
   internalNumber: string;
   assignedLineId: string;
   assignedLineName: string;
+  operationalStatus: OperationalStatus;
   latitude: number;
   longitude: number;
   speedKmh: number;
@@ -78,9 +79,10 @@ export async function getFleetSnapshot(options: { forceFresh?: boolean } = {}): 
 
 export async function invalidateFleetCache() {
   memoryCache = null;
+  memoryStaleCache = null;
   if (!isRedisConfigured()) return;
   try {
-    await redisCommand(["DEL", fleetCacheKey]);
+    await redisCommand(["DEL", fleetCacheKey, fleetStaleCacheKey]);
   } catch {
     // Cache invalidation should never block an operator assignment change.
   }
@@ -117,6 +119,7 @@ async function buildFleetSnapshot(): Promise<FleetSnapshot> {
           internalNumber: assignment?.internalNumber ?? "",
           assignedLineId: assignedLine?.id ?? assignment?.assignedLineId ?? "",
           assignedLineName: assignedLine?.name ?? "",
+          operationalStatus: assignment?.operationalStatus ?? "EN_SERVICIO",
           label: assignment?.label || device.label,
           line: assignedLine?.number ?? device.line,
           color: assignedLine?.color ?? device.color,

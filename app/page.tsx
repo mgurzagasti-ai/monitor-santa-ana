@@ -8,6 +8,10 @@ import styles from "./page.module.css";
 const FleetMap = dynamic(() => import("./ui/FleetMap"), { ssr: false });
 const selectedDeviceStorageKey = "santaAnaSelectedDeviceId";
 
+type OperationalStatus = "EN_SERVICIO" | "FUERA_DE_SERVICIO" | "TALLER";
+
+const operationalStatusOptions: OperationalStatus[] = ["EN_SERVICIO", "FUERA_DE_SERVICIO", "TALLER"];
+
 type FleetVehicle = {
   deviceId: number;
   label: string;
@@ -16,6 +20,7 @@ type FleetVehicle = {
   internalNumber?: string;
   assignedLineId?: string;
   assignedLineName?: string;
+  operationalStatus?: OperationalStatus;
   latitude: number;
   longitude: number;
   speedKmh: number;
@@ -70,6 +75,7 @@ type VehicleAssignment = {
   internalNumber: string;
   label: string;
   assignedLineId: string;
+  operationalStatus: OperationalStatus;
 };
 
 type TraccarDevice = {
@@ -83,6 +89,15 @@ type DeviceDraft = {
   deviceId: string;
   internalNumber: string;
   assignedLineId: string;
+};
+
+type MonitorDevice = {
+  deviceId: number;
+  uniqueId?: string;
+  name?: string;
+  internalNumber: string;
+  assignedLineId: string;
+  operationalStatus: OperationalStatus;
 };
 
 type StopDraft = {
@@ -353,6 +368,7 @@ export default function Home() {
 
     const internalNumber = confirmation.internalNumber;
     const nextLineId = confirmation.assignedLineId;
+    const operationalStatus = selectedVehicle.operationalStatus ?? selectedAssignment?.operationalStatus ?? "EN_SERVICIO";
 
     setSavingAssignment(true);
     try {
@@ -363,7 +379,8 @@ export default function Home() {
         const nextMonitorDevice = {
           ...monitorDevice,
           internalNumber,
-          assignedLineId: nextLineId
+          assignedLineId: nextLineId,
+          operationalStatus
         };
         const response = await fetch("/api/devices", {
           method: "POST",
@@ -378,7 +395,8 @@ export default function Home() {
           deviceId: device.deviceId,
           internalNumber: device.internalNumber,
           label: `Colectivo ${device.internalNumber}`,
-          assignedLineId: device.assignedLineId
+          assignedLineId: device.assignedLineId,
+          operationalStatus: normalizeOperationalStatus(device.operationalStatus)
         })));
       } else {
         const response = await fetch("/api/assignments", {
@@ -388,7 +406,8 @@ export default function Home() {
             deviceId: selectedVehicle.deviceId,
             internalNumber,
             label: `Colectivo ${internalNumber}`,
-            assignedLineId: nextLineId
+            assignedLineId: nextLineId,
+            operationalStatus
           })
         });
 
@@ -408,13 +427,79 @@ export default function Home() {
     }
   }
 
+  async function saveOperationalStatus(operationalStatus: OperationalStatus) {
+    if (!selectedVehicle) return;
+
+    const internalNumber = selectedVehicle.internalNumber || selectedAssignment?.internalNumber || "";
+    const assignedLineId = selectedVehicle.assignedLineId || selectedAssignment?.assignedLineId || "";
+    if (!internalNumber || !assignedLineId) {
+      setAssignmentMessage("Falta interno o linea asignada.");
+      return;
+    }
+
+    setSavingAssignment(true);
+    try {
+      const monitorDevices = readMonitorDevices();
+      const monitorDevice = monitorDevices.find((device) => device.deviceId === selectedVehicle.deviceId);
+
+      if (monitorDevice) {
+        const nextMonitorDevice = { ...monitorDevice, operationalStatus };
+        const response = await fetch("/api/devices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nextMonitorDevice)
+        });
+        const data = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el estado");
+
+        const nextDevices = upsertMonitorDevice(nextMonitorDevice);
+        setAssignments(nextDevices.map((device) => ({
+          deviceId: device.deviceId,
+          internalNumber: device.internalNumber,
+          label: `Colectivo ${device.internalNumber}`,
+          assignedLineId: device.assignedLineId,
+          operationalStatus: normalizeOperationalStatus(device.operationalStatus)
+        })));
+      } else {
+        const response = await fetch("/api/assignments", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deviceId: selectedVehicle.deviceId,
+            internalNumber,
+            label: selectedAssignment?.label || selectedVehicle.label || `Colectivo ${internalNumber}`,
+            assignedLineId,
+            operationalStatus
+          })
+        });
+        const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
+        if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el estado");
+        if (data.assignments) setAssignments(data.assignments);
+      }
+
+      setFleet((current) => ({
+        ...current,
+        vehicles: current.vehicles.map((vehicle) =>
+          vehicle.deviceId === selectedVehicle.deviceId ? { ...vehicle, operationalStatus } : vehicle
+        )
+      }));
+      setAssignmentMessage("Estado guardado.");
+      await loadFleet();
+    } catch (error) {
+      setAssignmentMessage(error instanceof Error ? error.message : "No se pudo guardar el estado");
+    } finally {
+      setSavingAssignment(false);
+    }
+  }
+
   async function syncMonitorDevices(monitorDevices: ReturnType<typeof readMonitorDevices>) {
     if (monitorDevices.length === 0) return;
 
     const syncKey = JSON.stringify(monitorDevices.map((device) => ({
       deviceId: device.deviceId,
       internalNumber: device.internalNumber,
-      assignedLineId: device.assignedLineId
+      assignedLineId: device.assignedLineId,
+      operationalStatus: normalizeOperationalStatus(device.operationalStatus)
     })));
     if (syncedMonitorDevicesRef.current === syncKey) return;
 
@@ -471,7 +556,8 @@ export default function Home() {
       deviceId: device.deviceId,
       internalNumber: device.internalNumber,
       label: `Colectivo ${device.internalNumber}`,
-      assignedLineId: device.assignedLineId
+      assignedLineId: device.assignedLineId,
+      operationalStatus: normalizeOperationalStatus(device.operationalStatus)
     }));
     if (localAssignments.length > 0) {
       setAssignments(localAssignments);
@@ -539,7 +625,8 @@ export default function Home() {
         uniqueId: confirmation.uniqueId,
         name: confirmation.gpsLabel,
         internalNumber: confirmation.internalNumber,
-        assignedLineId: confirmation.assignedLineId
+        assignedLineId: confirmation.assignedLineId,
+        operationalStatus: "EN_SERVICIO" as OperationalStatus
       };
       const response = await fetch("/api/devices", {
         method: "POST",
@@ -554,7 +641,8 @@ export default function Home() {
         deviceId: device.deviceId,
         internalNumber: device.internalNumber,
         label: `Colectivo ${device.internalNumber}`,
-        assignedLineId: device.assignedLineId
+        assignedLineId: device.assignedLineId,
+        operationalStatus: normalizeOperationalStatus(device.operationalStatus)
       })));
       selectVehicle(confirmation.deviceId);
       setDeviceMessage("GPS cargado para el monitor y la APK.");
@@ -673,7 +761,7 @@ export default function Home() {
               </span>
               <span className={styles.vehicleText}>
                 <strong>{vehicle.label}</strong>
-                <small>{formatDate(vehicle.fixTime)}</small>
+                <small>{formatDate(vehicle.fixTime)} - {formatOperationalStatus(vehicle.operationalStatus)}</small>
               </span>
               <span className={styles.speed}>{Math.round(vehicle.speedKmh)} km/h</span>
             </button>
@@ -754,6 +842,20 @@ export default function Home() {
                 {lineRoutesWithPaths.map((line) => (
                   <option key={line.id} value={line.id}>
                     {formatLineLabel(line)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>Estado operativo</span>
+              <select
+                value={selectedVehicle.operationalStatus ?? selectedAssignment?.operationalStatus ?? "EN_SERVICIO"}
+                onChange={(event) => saveOperationalStatus(event.target.value as OperationalStatus)}
+                disabled={savingAssignment}
+              >
+                {operationalStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {formatOperationalStatus(status)}
                   </option>
                 ))}
               </select>
@@ -1012,24 +1114,29 @@ function saveSelectedDeviceId(deviceId: number | null) {
   }
 }
 
-function readMonitorDevices(): Array<{ deviceId: number; uniqueId?: string; name?: string; internalNumber: string; assignedLineId: string }> {
+function readMonitorDevices(): MonitorDevice[] {
   if (typeof window === "undefined") return [];
 
   try {
-    const rows = JSON.parse(window.localStorage.getItem("santaAnaMonitorDevices") ?? "[]") as Array<{
-      deviceId: number;
-      uniqueId?: string;
-      name?: string;
-      internalNumber: string;
-      assignedLineId: string;
-    }>;
-    return Array.isArray(rows) ? rows.filter((row) => Number.isFinite(Number(row.deviceId)) && row.internalNumber && row.assignedLineId) : [];
+    const rows = JSON.parse(window.localStorage.getItem("santaAnaMonitorDevices") ?? "[]") as Partial<MonitorDevice>[];
+    return Array.isArray(rows)
+      ? rows
+          .filter((row) => Number.isFinite(Number(row.deviceId)) && row.internalNumber && row.assignedLineId)
+          .map((row) => ({
+            deviceId: Number(row.deviceId),
+            uniqueId: row.uniqueId,
+            name: row.name,
+            internalNumber: row.internalNumber ?? "",
+            assignedLineId: row.assignedLineId ?? "",
+            operationalStatus: normalizeOperationalStatus(row.operationalStatus)
+          }))
+      : [];
   } catch {
     return [];
   }
 }
 
-function upsertMonitorDevice(next: { deviceId: number; uniqueId?: string; name?: string; internalNumber: string; assignedLineId: string }) {
+function upsertMonitorDevice(next: MonitorDevice) {
   const devices = readMonitorDevices();
   const index = devices.findIndex((device) => device.deviceId === next.deviceId);
   if (index >= 0) {
@@ -1039,6 +1146,18 @@ function upsertMonitorDevice(next: { deviceId: number; uniqueId?: string; name?:
   }
   window.localStorage.setItem("santaAnaMonitorDevices", JSON.stringify(devices));
   return devices;
+}
+
+function normalizeOperationalStatus(value: unknown): OperationalStatus {
+  return operationalStatusOptions.includes(value as OperationalStatus)
+    ? (value as OperationalStatus)
+    : "EN_SERVICIO";
+}
+
+function formatOperationalStatus(status: OperationalStatus | undefined) {
+  if (status === "FUERA_DE_SERVICIO") return "Fuera de servicio";
+  if (status === "TALLER") return "Taller";
+  return "En servicio";
 }
 
 function routeSelectionLabel(selectedCount: number) {

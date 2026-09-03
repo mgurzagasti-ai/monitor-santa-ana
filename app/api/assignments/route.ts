@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readAssignments, upsertAssignment, type VehicleAssignment } from "@/app/data/assignments";
+import {
+  normalizeOperationalStatus,
+  readAssignments,
+  upsertAssignment,
+  type VehicleAssignment
+} from "@/app/data/assignments";
 import { invalidateFleetCache } from "@/app/data/fleet";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +20,7 @@ export async function PATCH(request: NextRequest) {
     const internalNumber = String(body.internalNumber ?? "").trim();
     const assignedLineId = String(body.assignedLineId ?? "").trim();
     const label = String(body.label ?? `Colectivo ${internalNumber}`).trim();
+    const operationalStatus = normalizeOperationalStatus(body.operationalStatus);
 
     if (!Number.isFinite(deviceId) || deviceId <= 0) {
       return NextResponse.json({ error: "deviceId invalido" }, { status: 400 });
@@ -46,7 +52,8 @@ export async function PATCH(request: NextRequest) {
       deviceId,
       internalNumber,
       label,
-      assignedLineId
+      assignedLineId,
+      operationalStatus
     });
     await invalidateFleetCache();
 

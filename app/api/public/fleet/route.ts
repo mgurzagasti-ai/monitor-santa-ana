@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(await getFleetSnapshot(), {
+    const snapshot = await getFleetSnapshot();
+    return NextResponse.json({
+      ...snapshot,
+      vehicles: snapshot.vehicles.filter((vehicle) => (vehicle.operationalStatus ?? "EN_SERVICIO") === "EN_SERVICIO")
+    }, {
       headers: {
         "Cache-Control": "public, max-age=0, must-revalidate",
         "Vercel-CDN-Cache-Control": "public, s-maxage=5, stale-while-revalidate=25"
