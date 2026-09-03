@@ -6,21 +6,24 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const rateLimit = await checkRateLimit(getClientIp(request), "fleet", {
-      limit: 600,
-      windowSeconds: 60
-    });
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too Many Requests" },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(rateLimit.retryAfterSeconds),
-            "Cache-Control": "private, no-store"
+    const clientIp = getClientIp(request);
+    if (clientIp) {
+      const rateLimit = await checkRateLimit(clientIp, "fleet", {
+        limit: 60000,
+        windowSeconds: 60
+      });
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: "Too Many Requests" },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(rateLimit.retryAfterSeconds),
+              "Cache-Control": "private, no-store"
+            }
           }
-        }
-      );
+        );
+      }
     }
 
     return NextResponse.json(await getFleetSnapshot(), {
@@ -50,5 +53,5 @@ function getClientIp(request: NextRequest) {
     "";
   const ip = headerValue.split(",")[0]?.trim();
 
-  return ip || "unknown";
+  return ip || null;
 }
