@@ -498,3 +498,12 @@ pm.cmd run build termino correctamente.
 - Probado en produccion y funcionando correctamente.
 - Publicidad propia: rotacion verificada; los anuncios requieren `imageUrl`.
 - Proximo trabajo: continuar carga de paradas reales y validar ETA en servicio real.
+## 2026-09-07 - stop-arrivals con geometria on demand
+
+- `/api/public/stop-arrivals` ahora construye la geometria como fallback si no esta cacheada.
+- Ya no depende de ejecutar previamente `/api/admin/route-geometry`.
+- El build concurrente se comparte por `line.id` para evitar reconstrucciones duplicadas.
+- Verificacion: `tests/stopArrivals.test.ts` 42/42 OK.
+- Verificacion: suite 86/86 OK.
+- Verificacion: build OK.
+- Pendiente: validar en produccion con prueba real de Linea 28 / colectivo 229.

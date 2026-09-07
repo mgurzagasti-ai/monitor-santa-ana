@@ -77,12 +77,74 @@ test("parada de otra linea devuelve 404", async () => {
   assert.equal(response.status, 404);
 });
 
-test("geometria no cacheada devuelve 200 sin prediccion", async () => {
-  const response = await requestWith(defaultDependencies({ geometry: null }), validQuery());
+test("geometria no cacheada usa fallback build y calcula llegada", async () => {
+  let buildCalls = 0;
+  const response = await requestWith(
+    defaultDependencies({
+      geometry: null,
+      onBuildRouteGeometry: () => {
+        buildCalls += 1;
+      }
+    }),
+    validQuery()
+  );
   const body = await response.json();
   assert.equal(response.status, 200);
+  assert.equal(buildCalls, 1);
+  assert.equal(body.etaAvailable, true);
+  assert.equal(body.updatedAt, fleetUpdatedAt);
+  assert.equal(body.arrivals[0].internalNumber, "705");
+});
+
+test("geometria cacheada lista no reconstruye", async () => {
+  let buildCalls = 0;
+  const response = await requestWith(
+    defaultDependencies({
+      onBuildRouteGeometry: () => {
+        buildCalls += 1;
+      }
+    }),
+    validQuery()
+  );
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(buildCalls, 0);
+  assert.equal(body.etaAvailable, true);
+});
+
+test("fallback sin geometria lista conserva respuesta vacia", async () => {
+  const response = await requestWith(defaultDependencies({ geometry: null, buildGeometry: bundleWith([]) }), validQuery());
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.updatedAt, null);
   assert.equal(body.etaAvailable, false);
   assert.deepEqual(body.arrivals, []);
+});
+test("requests concurrentes sin cache comparten el mismo build", async () => {
+  let buildCalls = 0;
+  let resolveBuild: (bundle: RouteGeometryBundle) => void = () => undefined;
+  const buildPromise = new Promise<RouteGeometryBundle>((resolve) => {
+    resolveBuild = resolve;
+  });
+  const dependencies = defaultDependencies({
+    geometry: null,
+    buildRouteGeometry: async () => {
+      buildCalls += 1;
+      return buildPromise;
+    }
+  });
+
+  const firstRequest = requestWith(dependencies, validQuery());
+  const secondRequest = requestWith(dependencies, validQuery());
+  resolveBuild(geometryBundle);
+
+  const [firstBody, secondBody] = await Promise.all([
+    firstRequest.then((response) => response.json()),
+    secondRequest.then((response) => response.json())
+  ]);
+  assert.equal(buildCalls, 1);
+  assert.equal(firstBody.etaAvailable, true);
+  assert.equal(secondBody.etaAvailable, true);
 });
 
 test("stopEtaReady=false devuelve 200 sin prediccion", async () => {
@@ -252,11 +314,9 @@ test("no llama dependencias prohibidas directas de Traccar ni build KML", async 
   assert.equal(body.arrivals.length, 1);
 });
 
-test("el archivo del endpoint no importa getOrBuildRouteGeometryBundle ni Traccar/fetch KML", () => {
+test("el archivo del endpoint no importa Traccar ni fetch directo", () => {
   const source = readFileSync("app/api/public/stop-arrivals/route.ts", "utf8");
-  assert.equal(source.includes("getOrBuildRouteGeometryBundle"), false);
   assert.equal(source.includes("fetchPositions"), false);
-  assert.equal(source.includes("kmlUrl"), false);
   assert.equal(source.includes("fetch("), false);
 });
 
@@ -299,7 +359,10 @@ function defaultDependencies({
   stopProjection,
   rateAllowed = true,
   readLineStopsError,
-  fleetUpdatedAtValue = fleetUpdatedAt
+  fleetUpdatedAtValue = fleetUpdatedAt,
+  buildGeometry = geometryBundle,
+  buildRouteGeometry,
+  onBuildRouteGeometry
 }: {
   stops?: LineStop[];
   vehicles?: ReturnType<typeof vehicle>[];
@@ -308,6 +371,9 @@ function defaultDependencies({
   rateAllowed?: boolean;
   readLineStopsError?: Error;
   fleetUpdatedAtValue?: string;
+  buildGeometry?: RouteGeometryBundle;
+  buildRouteGeometry?: () => Promise<RouteGeometryBundle>;
+  onBuildRouteGeometry?: () => void;
 } = {}): StopArrivalsDependencies {
   return {
     lineRoutes: [line, otherLine],
@@ -316,6 +382,11 @@ function defaultDependencies({
       return stops;
     },
     getCachedRouteGeometryBundle: async () => geometry,
+    getOrBuildRouteGeometryBundle: async () => {
+      if (buildRouteGeometry) return buildRouteGeometry();
+      onBuildRouteGeometry?.();
+      return buildGeometry;
+    },
     getOrBuildLineProjectionReadiness: async (lineId, lineStops, bundle) => {
       const readiness = buildLineProjectionReadiness(lineId, lineStops, bundle);
       if (!stopProjection) return readiness;

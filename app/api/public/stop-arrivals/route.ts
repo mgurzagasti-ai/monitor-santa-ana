@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server.js";
 import { lineRoutes, type LineRouteDefinition } from "../../../data/lineRoutes.ts";
-import { getCachedRouteGeometryBundle, type RouteGeometryBundle } from "../../../data/routeGeometry.ts";
+import {
+  getCachedRouteGeometryBundle,
+  getOrBuildRouteGeometryBundle,
+  type RouteGeometryBundle
+} from "../../../data/routeGeometry.ts";
 import { getOrBuildLineProjectionReadiness, type StopProjection } from "../../../data/stopProjections.ts";
 import { evaluateVehicleForStop, type VehicleStopState } from "../../../data/vehicleRouteProjection.ts";
 import { estimateEtaForVehicleStop, type EtaEstimate } from "../../../data/etaEstimate.ts";
@@ -59,6 +63,7 @@ export type StopArrivalsDependencies = {
   lineRoutes: LineRouteDefinition[];
   readLineStops: () => Promise<LineStop[]>;
   getCachedRouteGeometryBundle: (lineId: string) => Promise<RouteGeometryBundle | null>;
+  getOrBuildRouteGeometryBundle: (line: LineRouteDefinition) => Promise<RouteGeometryBundle>;
   getOrBuildLineProjectionReadiness: typeof getOrBuildLineProjectionReadiness;
   getFleetSnapshot: () => Promise<FleetSnapshot>;
   evaluateVehicleForStop: typeof evaluateVehicleForStop;
@@ -76,6 +81,8 @@ const privateNoStoreHeaders = {
   "Cache-Control": "private, no-store"
 };
 
+const routeGeometryBuilds = new Map<string, Promise<RouteGeometryBundle>>();
+
 export async function GET(request: NextRequest) {
   const [{ getFleetSnapshot }, { checkRateLimit }, { readLineStops }] = await Promise.all([
     import("../../../data/fleet.ts"),
@@ -87,6 +94,7 @@ export async function GET(request: NextRequest) {
     lineRoutes,
     readLineStops,
     getCachedRouteGeometryBundle,
+    getOrBuildRouteGeometryBundle,
     getOrBuildLineProjectionReadiness,
     getFleetSnapshot,
     evaluateVehicleForStop,
@@ -134,8 +142,7 @@ export function createStopArrivalsHandler(dependencies: StopArrivalsDependencies
       }
 
       const currentTime = dependencies.now();
-      const fallbackUpdatedAt = currentTime.toISOString();
-      const geometryBundle = await dependencies.getCachedRouteGeometryBundle(line.id);
+      const geometryBundle = await resolveRouteGeometryBundle(line, dependencies);
       if (!geometryBundle || !isRouteGeometryReady(geometryBundle)) {
         return NextResponse.json(emptyResponse(line.id, stop.id, null), { headers: publicCacheHeaders });
       }
@@ -175,6 +182,21 @@ export function createStopArrivalsHandler(dependencies: StopArrivalsDependencies
       );
     }
   };
+}
+
+async function resolveRouteGeometryBundle(line: LineRouteDefinition, dependencies: StopArrivalsDependencies) {
+  const cached = await dependencies.getCachedRouteGeometryBundle(line.id);
+  if (cached && isRouteGeometryReady(cached)) return cached;
+
+  let build = routeGeometryBuilds.get(line.id);
+  if (!build) {
+    build = dependencies.getOrBuildRouteGeometryBundle(line).finally(() => {
+      routeGeometryBuilds.delete(line.id);
+    });
+    routeGeometryBuilds.set(line.id, build);
+  }
+
+  return build;
 }
 
 function buildPublicArrival(
