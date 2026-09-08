@@ -507,3 +507,16 @@ pm.cmd run build termino correctamente.
 - Verificacion: suite 86/86 OK.
 - Verificacion: build OK.
 - Pendiente: validar en produccion con prueba real de Linea 28 / colectivo 229.
+
+## 2026-09-08 - Paradas recien pasadas por progreso GPS
+
+- Se implemento deteccion generica de `recently_passed` para todas las lineas, unidades y paradas, sin excepciones por caso puntual.
+- `/api/public/stop-arrivals` guarda historial corto de progreso por `deviceId + lineId + direction`, no por parada.
+- La clave Redis/cache usa TTL default `180 s`.
+- La actualizacion del historial es atomica y solo avanza cuando `fixTime` es realmente mas nuevo, para conservar el par anterior/actual ante consultas concurrentes.
+- Criterio post-parada: ventana dinamica `max(120m, min(500m, velocidad_mps * 45s))`.
+- Estado interno: `recently_passed`.
+- Estado publico: `"passed"` para compatibilidad con APK 1.1.12.
+- Android 1.1.12 ya reconoce `"passed"` y muestra `Alejandose`, sin recompilar APK.
+- Verificacion realizada antes de actualizar memoria: suite `95/95` OK y build OK.
+- Pendiente: validar comportamiento real en produccion.

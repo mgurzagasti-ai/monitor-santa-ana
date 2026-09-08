@@ -8,6 +8,11 @@ import {
 import { getOrBuildLineProjectionReadiness, type StopProjection } from "../../../data/stopProjections.ts";
 import { evaluateVehicleForStop, type VehicleStopState } from "../../../data/vehicleRouteProjection.ts";
 import { estimateEtaForVehicleStop, type EtaEstimate } from "../../../data/etaEstimate.ts";
+import {
+  buildVehicleRouteProgressSample,
+  recordVehicleRouteProgressSample,
+  type VehicleRouteProgressHistory
+} from "../../../data/vehicleRouteProgressHistory.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +27,7 @@ type LineStop = {
 };
 
 type FleetVehicle = {
+  deviceId: number;
   assignedLineId: string;
   internalNumber: string;
   latitude: number;
@@ -39,7 +45,7 @@ type FleetSnapshot = {
 type PublicArrival = {
   internalNumber: string;
   direction: "ida" | "vuelta";
-  status: "approaching" | "arriving";
+  status: "approaching" | "arriving" | "passed";
   etaMinutes: number;
   distanceRemainingMeters: number;
 };
@@ -68,6 +74,7 @@ export type StopArrivalsDependencies = {
   getFleetSnapshot: () => Promise<FleetSnapshot>;
   evaluateVehicleForStop: typeof evaluateVehicleForStop;
   estimateEtaForVehicleStop: typeof estimateEtaForVehicleStop;
+  recordVehicleRouteProgressSample: typeof recordVehicleRouteProgressSample;
   checkRateLimit: (ip: string, route: string, options: { limit: number; windowSeconds: number }) => Promise<RateLimitResult>;
   now: () => Date;
 };
@@ -99,6 +106,7 @@ export async function GET(request: NextRequest) {
     getFleetSnapshot,
     evaluateVehicleForStop,
     estimateEtaForVehicleStop,
+    recordVehicleRouteProgressSample,
     checkRateLimit,
     now: () => new Date()
   })(request);
@@ -155,9 +163,11 @@ export function createStopArrivalsHandler(dependencies: StopArrivalsDependencies
 
       const fleet = await dependencies.getFleetSnapshot();
       const updatedAt = isValidTimestamp(fleet.updatedAt) ? fleet.updatedAt : null;
-      const arrivals = fleet.vehicles
-        .filter((vehicle) => vehicle.assignedLineId === line.id)
-        .map((vehicle, index) => buildPublicArrival(vehicle, geometryBundle, stopProjection, currentTime, index, dependencies))
+      const arrivals = (await Promise.all(
+        fleet.vehicles
+          .filter((vehicle) => vehicle.assignedLineId === line.id)
+          .map((vehicle, index) => buildPublicArrival(vehicle, geometryBundle, stopProjection, currentTime, index, dependencies))
+      ))
         .filter((arrival): arrival is PublicArrival & { sortIndex: number } => arrival !== null)
         .sort(compareArrivals)
         .map(({ sortIndex: _sortIndex, ...arrival }) => arrival);
@@ -199,16 +209,27 @@ async function resolveRouteGeometryBundle(line: LineRouteDefinition, dependencie
   return build;
 }
 
-function buildPublicArrival(
+async function buildPublicArrival(
   vehicle: FleetVehicle,
   geometryBundle: RouteGeometryBundle,
   stopProjection: StopProjection,
   currentTime: Date,
   sortIndex: number,
   dependencies: StopArrivalsDependencies
-): (PublicArrival & { sortIndex: number }) | null {
-  const state = dependencies.evaluateVehicleForStop({ vehicle, geometryBundle, stopProjection });
+): Promise<(PublicArrival & { sortIndex: number }) | null> {
+  const initialState = dependencies.evaluateVehicleForStop({ vehicle, geometryBundle, stopProjection });
+  const history = await recordProgressFromState(vehicle, initialState, dependencies);
+  const state = dependencies.evaluateVehicleForStop({
+    vehicle,
+    geometryBundle,
+    stopProjection,
+    previousProjection: history?.previous ?? null
+  });
   const eta = dependencies.estimateEtaForVehicleStop(state, vehicle, { currentTime });
+
+  if (state.status === "recently_passed") {
+    return publicPassedArrival(vehicle, state, sortIndex);
+  }
 
   if (state.status === "arriving") {
     return publicArrival(vehicle, state, eta, sortIndex);
@@ -219,6 +240,46 @@ function buildPublicArrival(
   }
 
   return null;
+}
+
+async function recordProgressFromState(
+  vehicle: FleetVehicle,
+  state: VehicleStopState,
+  dependencies: StopArrivalsDependencies
+): Promise<VehicleRouteProgressHistory | null> {
+  if (state.direction !== "ida" && state.direction !== "vuelta") return null;
+  if (state.vehicleMeasureMeters === null || state.distanceFromRouteMeters === null) return null;
+
+  const sample = buildVehicleRouteProgressSample({
+    deviceId: vehicle.deviceId,
+    lineId: vehicle.assignedLineId,
+    projection: {
+      lineId: vehicle.assignedLineId,
+      direction: state.direction,
+      vehicleMeasureMeters: state.vehicleMeasureMeters,
+      distanceFromRouteMeters: state.distanceFromRouteMeters
+    },
+    fixTime: vehicle.fixTime
+  });
+  if (!sample) return null;
+
+  return dependencies.recordVehicleRouteProgressSample(sample);
+}
+
+function publicPassedArrival(
+  vehicle: FleetVehicle,
+  state: VehicleStopState,
+  sortIndex: number
+): (PublicArrival & { sortIndex: number }) | null {
+  if (state.direction !== "ida" && state.direction !== "vuelta") return null;
+  return {
+    internalNumber: vehicle.internalNumber,
+    direction: state.direction,
+    status: "passed",
+    etaMinutes: 0,
+    distanceRemainingMeters: 0,
+    sortIndex
+  };
 }
 
 function publicArrival(
@@ -278,7 +339,9 @@ function compareArrivals(first: PublicArrival & { sortIndex: number }, second: P
 }
 
 function statusRank(status: PublicArrival["status"]) {
-  return status === "arriving" ? 0 : 1;
+  if (status === "arriving") return 0;
+  if (status === "approaching") return 1;
+  return 2;
 }
 
 function isValidTimestamp(value: string | null) {
@@ -295,3 +358,4 @@ function getClientIp(request: NextRequest) {
 
   return ip || "unknown";
 }
+

@@ -8,6 +8,10 @@ export const ambiguousRouteDistanceDifferenceMeters = 30;
 export const courseCompatibilityDegrees = 60;
 export const arrivingBeforeMeters = 80;
 export const passedAfterMeters = 40;
+export const recentlyPassedMinimumWindowMeters = 120;
+export const recentlyPassedMaximumWindowMeters = 500;
+export const recentlyPassedSpeedWindowSeconds = 45;
+export const previousProjectionMaxAgeSeconds = 90;
 
 export type VehicleRouteProjection = {
   lineId: string;
@@ -20,7 +24,7 @@ export type VehicleRouteProjection = {
   projectedLongitude: number;
 };
 
-export type VehicleStopStatus = "approaching" | "arriving" | "passed" | "no_prediction";
+export type VehicleStopStatus = "approaching" | "arriving" | "recently_passed" | "passed" | "no_prediction";
 
 export type VehicleStopStateReason =
   | "vehicle_off_route"
@@ -39,6 +43,14 @@ export type VehicleStopState = {
   distanceRemainingMeters: number | null;
   distanceFromRouteMeters: number | null;
   reason?: VehicleStopStateReason;
+};
+
+export type PreviousVehicleRouteProgress = {
+  lineId: string;
+  direction: "ida" | "vuelta";
+  vehicleMeasureMeters: number;
+  distanceFromRouteMeters: number;
+  fixTime: string;
 };
 
 export type VehicleProjectionInput = Pick<
@@ -64,11 +76,13 @@ export function projectVehicleOntoRoute(
 export function evaluateVehicleForStop({
   vehicle,
   geometryBundle,
-  stopProjection
+  stopProjection,
+  previousProjection
 }: {
   vehicle: VehicleProjectionInput;
   geometryBundle: RouteGeometryBundle;
   stopProjection: StopProjection;
+  previousProjection?: PreviousVehicleRouteProgress | null;
 }): VehicleStopState {
   if (!Number.isFinite(stopProjection.stopMeasureMeters)) {
     return noPrediction(stopProjection.stopMeasureMeters, "stop_not_ready");
@@ -123,7 +137,7 @@ export function evaluateVehicleForStop({
     };
   }
 
-  return {
+  const passedState: VehicleStopState = {
     status: "passed",
     direction: vehicleProjection.direction,
     vehicleMeasureMeters: vehicleProjection.vehicleMeasureMeters,
@@ -131,6 +145,68 @@ export function evaluateVehicleForStop({
     distanceRemainingMeters: null,
     distanceFromRouteMeters: vehicleProjection.distanceFromRouteMeters
   };
+
+  if (isRecentlyPassedStop({ vehicle, currentProjection: vehicleProjection, stopProjection, previousProjection })) {
+    return {
+      ...passedState,
+      status: "recently_passed",
+      distanceRemainingMeters: 0
+    };
+  }
+
+  return passedState;
+}
+
+export function isRecentlyPassedStop({
+  vehicle,
+  currentProjection,
+  stopProjection,
+  previousProjection
+}: {
+  vehicle: Pick<VehicleProjectionInput, "assignedLineId" | "speedKmh" | "fixTime">;
+  currentProjection: VehicleRouteProjection;
+  stopProjection: StopProjection;
+  previousProjection?: PreviousVehicleRouteProgress | null;
+}) {
+  if (currentProjection.lineId !== stopProjection.lineId || vehicle.assignedLineId !== stopProjection.lineId) return false;
+  if (currentProjection.direction !== stopProjection.direction) return false;
+  if (currentProjection.distanceFromRouteMeters > maxVehicleDistanceFromRouteMeters) return false;
+
+  const distanceAfterStop = currentProjection.vehicleMeasureMeters - stopProjection.stopMeasureMeters;
+  if (distanceAfterStop <= passedAfterMeters) return false;
+  if (distanceAfterStop > recentlyPassedWindowMeters(vehicle.speedKmh)) return false;
+
+  if (!previousProjection) return true;
+  if (previousProjection.lineId !== currentProjection.lineId) return false;
+  if (previousProjection.direction !== currentProjection.direction) return false;
+  if (previousProjection.distanceFromRouteMeters > maxVehicleDistanceFromRouteMeters) return false;
+  if (!isPreviousProjectionRecent(previousProjection.fixTime, vehicle.fixTime)) return false;
+
+  const crossedStop =
+    previousProjection.vehicleMeasureMeters < stopProjection.stopMeasureMeters &&
+    currentProjection.vehicleMeasureMeters > stopProjection.stopMeasureMeters;
+  const movedOutOfArrivingWindow =
+    previousProjection.vehicleMeasureMeters <= stopProjection.stopMeasureMeters + passedAfterMeters &&
+    currentProjection.vehicleMeasureMeters > stopProjection.stopMeasureMeters + passedAfterMeters;
+
+  return crossedStop || movedOutOfArrivingWindow;
+}
+
+export function recentlyPassedWindowMeters(speedKmh: number | null | undefined) {
+  const numericSpeed = typeof speedKmh === "number" ? speedKmh : Number.NaN;
+  const speedMetersPerSecond = Number.isFinite(numericSpeed) && numericSpeed > 0 ? numericSpeed / 3.6 : 0;
+  return Math.max(
+    recentlyPassedMinimumWindowMeters,
+    Math.min(recentlyPassedMaximumWindowMeters, speedMetersPerSecond * recentlyPassedSpeedWindowSeconds)
+  );
+}
+
+function isPreviousProjectionRecent(previousFixTime: string, currentFixTime: string | null | undefined) {
+  const previousMs = new Date(previousFixTime).getTime();
+  const currentMs = typeof currentFixTime === "string" ? new Date(currentFixTime).getTime() : Number.NaN;
+  if (!Number.isFinite(previousMs) || !Number.isFinite(currentMs)) return false;
+  const ageSeconds = Math.max(0, (currentMs - previousMs) / 1000);
+  return ageSeconds <= previousProjectionMaxAgeSeconds;
 }
 
 export function selectVehicleDirection(
@@ -241,3 +317,5 @@ function noPrediction(stopMeasureMeters: number, reason: VehicleStopStateReason)
     reason
   };
 }
+
+

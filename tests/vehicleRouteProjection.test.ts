@@ -89,12 +89,62 @@ test("arriving justo despues de parada dentro de 40m", () => {
 
 test("passed", () => {
   const state = evaluateVehicleForStop({
-    vehicle: vehicle(0, 0.011, 90),
+    vehicle: vehicle(0, 0.016, 90),
     geometryBundle: bundle,
     stopProjection: stopProjection("ida", idaGeometry.cumulativeDistanceMeters[1])
   });
   assert.equal(state.status, "passed");
   assert.equal(state.distanceRemainingMeters, null);
+});
+
+test("recently_passed cuando cruza la parada entre muestras", () => {
+  const stopMeasureMeters = idaGeometry.cumulativeDistanceMeters[1];
+  const state = evaluateVehicleForStop({
+    vehicle: { ...vehicle(0, 0.011, 90), speedKmh: 40, fixTime: "2026-01-01T12:00:30.000Z" },
+    geometryBundle: bundle,
+    stopProjection: stopProjection("ida", stopMeasureMeters),
+    previousProjection: {
+      lineId: "test",
+      direction: "ida",
+      vehicleMeasureMeters: stopMeasureMeters - 200,
+      distanceFromRouteMeters: 0,
+      fixTime: "2026-01-01T12:00:00.000Z"
+    }
+  });
+  assert.equal(state.status, "recently_passed");
+  assert.equal(state.distanceRemainingMeters, 0);
+});
+
+test("passed varios kilometros despues no es recently_passed", () => {
+  const longGeometry = geometry("ida", [
+    { latitude: 0, longitude: 0 },
+    { latitude: 0, longitude: 0.01 },
+    { latitude: 0, longitude: 0.08 }
+  ]);
+  const longBundle = bundleWith([longGeometry, vueltaGeometry]);
+  const state = evaluateVehicleForStop({
+    vehicle: { ...vehicle(0, 0.055, 90), speedKmh: 40 },
+    geometryBundle: longBundle,
+    stopProjection: stopProjection("ida", longGeometry.cumulativeDistanceMeters[1])
+  });
+  assert.equal(state.status, "passed");
+});
+
+test("previous de otra direccion no marca recently_passed en recorridos cercanos", () => {
+  const closeBundle = parallelCloseBundle();
+  const state = evaluateVehicleForStop({
+    vehicle: { ...vehicle(0.00008, 0.004, 270), speedKmh: 40, fixTime: "2026-01-01T12:00:30.000Z" },
+    geometryBundle: closeBundle,
+    stopProjection: stopProjection("vuelta", 300),
+    previousProjection: {
+      lineId: "test",
+      direction: "ida",
+      vehicleMeasureMeters: 200,
+      distanceFromRouteMeters: 0,
+      fixTime: "2026-01-01T12:00:00.000Z"
+    }
+  });
+  assert.equal(state.status, "passed");
 });
 
 test("diferencia angular cruzando 0/360", () => {
@@ -194,3 +244,4 @@ function stopProjection(direction: "ida" | "vuelta", stopMeasureMeters: number):
     calculatedAt: "2026-01-01T00:00:00.000Z"
   };
 }
+

@@ -7,6 +7,7 @@ import { buildCumulativeDistanceMeters, type RouteGeometry, type RouteGeometryBu
 import { buildLineProjectionReadiness, type StopProjection } from "../app/data/stopProjections.ts";
 import { evaluateVehicleForStop } from "../app/data/vehicleRouteProjection.ts";
 import { estimateEtaForVehicleStop } from "../app/data/etaEstimate.ts";
+import { recordVehicleRouteProgressSample, type VehicleRouteProgressHistory } from "../app/data/vehicleRouteProgressHistory.ts";
 
 type LineStop = {
   id: string;
@@ -190,8 +191,73 @@ test("arriving se incluye con eta 0", async () => {
   assert.equal(body.arrivals[0].etaMinutes, 0);
 });
 
-test("passed queda excluido", async () => {
-  const response = await requestWith(defaultDependencies({ vehicles: [vehicle("707", 0, 0.011, 90, 15)] }), validQuery());
+test("passed fuera de ventana queda excluido", async () => {
+  const response = await requestWith(defaultDependencies({ vehicles: [vehicle("707", 0, 0.016, 90, 15)] }), validQuery());
+  const body = await response.json();
+  assert.equal(body.etaAvailable, false);
+  assert.deepEqual(body.arrivals, []);
+});
+
+test("approaching a passed saltando arriving devuelve passed publico", async () => {
+  const previous = progressHistorySample({ vehicleMeasureMeters: 900, fixTime: "2026-09-03T11:58:30.000Z" });
+  const response = await requestWith(
+    defaultDependencies({
+      vehicles: [vehicle("712", 0, 0.011, 90, 40)],
+      recordHistory: async (current) => ({ previous, current })
+    }),
+    validQuery()
+  );
+  const body = await response.json();
+  assert.equal(body.etaAvailable, true);
+  assert.equal(body.arrivals[0].internalNumber, "712");
+  assert.equal(body.arrivals[0].status, "passed");
+  assert.equal(body.arrivals[0].etaMinutes, 0);
+});
+
+test("unidad recien pasada sin muestra anterior usa ventana fallback", async () => {
+  const response = await requestWith(defaultDependencies({ vehicles: [vehicle("713", 0, 0.011, 90, 40)] }), validQuery());
+  const body = await response.json();
+  assert.equal(body.etaAvailable, true);
+  assert.equal(body.arrivals[0].status, "passed");
+});
+
+test("unidad 5 km despues no es recentlyPassed", async () => {
+  const longStop = { ...stop, longitude: 0.01 };
+  const longGeometry = bundleWith([
+    geometry("ida", [
+      { latitude: 0, longitude: 0 },
+      { latitude: 0, longitude: 0.01 },
+      { latitude: 0, longitude: 0.08 }
+    ]),
+    geometry("vuelta", [
+      { latitude: 0.01, longitude: 0.08 },
+      { latitude: 0.01, longitude: 0 }
+    ])
+  ]);
+  const response = await requestWith(
+    defaultDependencies({
+      stops: [longStop],
+      geometry: longGeometry,
+      vehicles: [vehicle("714", 0, 0.055, 90, 40)]
+    }),
+    validQuery()
+  );
+  const body = await response.json();
+  assert.equal(body.etaAvailable, false);
+  assert.deepEqual(body.arrivals, []);
+});
+
+test("ida y vuelta proximas no mezclan direccion para recentlyPassed", async () => {
+  const previous = progressHistorySample({ direction: "ida", vehicleMeasureMeters: 500, fixTime: "2026-09-03T11:58:30.000Z" });
+  const response = await requestWith(
+    defaultDependencies({
+      geometry: closeGeometryBundle(),
+      vehicles: [vehicle("715", 0.00008, 0.004, 270, 40)],
+      stopProjection: { ...readyStopProjection(), direction: "vuelta", stopMeasureMeters: 300 },
+      recordHistory: async (current) => ({ previous, current })
+    }),
+    validQuery()
+  );
   const body = await response.json();
   assert.equal(body.etaAvailable, false);
   assert.deepEqual(body.arrivals, []);
@@ -362,7 +428,8 @@ function defaultDependencies({
   fleetUpdatedAtValue = fleetUpdatedAt,
   buildGeometry = geometryBundle,
   buildRouteGeometry,
-  onBuildRouteGeometry
+  onBuildRouteGeometry,
+  recordHistory
 }: {
   stops?: LineStop[];
   vehicles?: ReturnType<typeof vehicle>[];
@@ -374,6 +441,7 @@ function defaultDependencies({
   buildGeometry?: RouteGeometryBundle;
   buildRouteGeometry?: () => Promise<RouteGeometryBundle>;
   onBuildRouteGeometry?: () => void;
+  recordHistory?: typeof recordVehicleRouteProgressSample;
 } = {}): StopArrivalsDependencies {
   return {
     lineRoutes: [line, otherLine],
@@ -399,6 +467,7 @@ function defaultDependencies({
     }),
     evaluateVehicleForStop,
     estimateEtaForVehicleStop,
+    recordVehicleRouteProgressSample: recordHistory ?? (async (sample) => ({ previous: null, current: sample })),
     checkRateLimit: async () => ({
       allowed: rateAllowed,
       limit: 600,
@@ -425,6 +494,32 @@ function closeGeometryBundle() {
 }
 function readyStopProjection(): StopProjection {
   return buildLineProjectionReadiness("2-peron", [stop], geometryBundle).projections[0];
+}
+
+function progressHistorySample({
+  deviceId = 712,
+  lineId = "2-peron",
+  direction = "ida",
+  vehicleMeasureMeters,
+  distanceFromRouteMeters = 0,
+  fixTime
+}: {
+  deviceId?: number;
+  lineId?: string;
+  direction?: "ida" | "vuelta";
+  vehicleMeasureMeters: number;
+  distanceFromRouteMeters?: number;
+  fixTime: string;
+}): VehicleRouteProgressHistory["current"] {
+  return {
+    deviceId,
+    lineId,
+    direction,
+    vehicleMeasureMeters,
+    distanceFromRouteMeters,
+    fixTime,
+    fixTimeMs: new Date(fixTime).getTime()
+  };
 }
 
 function vehicle(
@@ -487,3 +582,4 @@ function bundleWith(geometries: RouteGeometry[]): RouteGeometryBundle {
     updatedAt: "2026-09-03T00:00:00.000Z"
   };
 }
+
