@@ -51,6 +51,42 @@ export async function removeAssignmentsByDeviceIds(deviceIds: number[]) {
   };
 }
 
+export async function replaceAssignmentDeviceId(
+  currentDeviceId: number,
+  nextDeviceId: number,
+  internalNumber: string
+) {
+  const assignments = await readAssignments();
+  const normalizedInternalNumber = internalNumber.trim().toLowerCase();
+  const currentAssignment = assignments.find(
+    (assignment) =>
+      assignment.deviceId === currentDeviceId &&
+      assignment.internalNumber.trim().toLowerCase() === normalizedInternalNumber
+  );
+  const targetAssignment = assignments.find((assignment) => assignment.deviceId === nextDeviceId);
+
+  if (!currentAssignment) {
+    throw new Error("No existe la asignacion actual esperada");
+  }
+
+  if (targetAssignment) {
+    throw new Error("El deviceId destino ya tiene una asignacion");
+  }
+
+  const nextAssignments = assignments.map((assignment) =>
+    assignment === currentAssignment ? { ...assignment, deviceId: nextDeviceId } : assignment
+  );
+
+  await writeRedisAssignments(nextAssignments);
+  writeLocalAssignments(nextAssignments);
+
+  return {
+    assignments: nextAssignments,
+    updatedAssignment: { ...currentAssignment, deviceId: nextDeviceId },
+    previousAssignment: currentAssignment
+  };
+}
+
 function readLocalAssignments(): VehicleAssignment[] {
   if (!existsSync(assignmentsFile)) return [];
 
