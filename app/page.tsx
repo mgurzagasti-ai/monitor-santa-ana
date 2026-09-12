@@ -145,6 +145,7 @@ export default function Home() {
   const [lineRoutes, setLineRoutes] = useState<LineRoute[]>([]);
   const [lineStops, setLineStops] = useState<LineStop[]>([]);
   const [assignments, setAssignments] = useState<VehicleAssignment[]>([]);
+  const [configuredMonitorDevices, setConfiguredMonitorDevices] = useState<MonitorDevice[]>([]);
   const [traccarDevices, setTraccarDevices] = useState<TraccarDevice[]>([]);
   const [deviceManagerOpen, setDeviceManagerOpen] = useState(false);
   const [deviceDraft, setDeviceDraft] = useState<DeviceDraft>({ deviceId: "", internalNumber: "", assignedLineId: "" });
@@ -184,7 +185,7 @@ export default function Home() {
       operationalStatus: normalizeOperationalStatus(vehicle.operationalStatus),
       hasPosition: true
     }));
-    const monitorDevices = readMonitorDevices();
+    const monitorDevices = configuredMonitorDevices.length > 0 ? configuredMonitorDevices : readMonitorDevices();
     if (monitorDevices.length === 0) return fallbackVehicles;
 
     const configuredVehicles = monitorDevices.map((device) => {
@@ -214,7 +215,7 @@ export default function Home() {
     });
 
     return configuredVehicles.length > 0 ? configuredVehicles : fallbackVehicles;
-  }, [fleet.vehicles, lineRoutesWithPaths]);
+  }, [configuredMonitorDevices, fleet.vehicles, lineRoutesWithPaths]);
 
   const selectedVehicle = useMemo(() => {
     return fleetListVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? fleetListVehicles[0] ?? null;
@@ -506,8 +507,16 @@ export default function Home() {
   async function loadFleet() {
     setLoading(true);
     try {
-      const monitorDevices = readMonitorDevices();
-      await syncMonitorDevices(monitorDevices).catch(() => null);
+      const serverAssignments = await fetchServerAssignments().catch(() => []);
+      if (serverAssignments.length > 0) {
+        setAssignments(serverAssignments);
+      }
+
+      const serverMonitorDevices = assignmentsToMonitorDevices(serverAssignments);
+      const localMonitorDevices = readMonitorDevices();
+      const monitorDevices = serverMonitorDevices.length > 0 ? serverMonitorDevices : localMonitorDevices;
+      setConfiguredMonitorDevices(monitorDevices);
+
       const url = monitorDevices.length > 0
         ? `/api/monitor-fleet?devices=${encodeURIComponent(JSON.stringify(monitorDevices))}`
         : "/api/fleet";
@@ -548,21 +557,16 @@ export default function Home() {
   }
 
   async function loadAssignments() {
-    const localAssignments = readMonitorDevices().map((device) => ({
-      deviceId: device.deviceId,
-      internalNumber: device.internalNumber,
-      label: `Colectivo ${device.internalNumber}`,
-      assignedLineId: device.assignedLineId,
-      operationalStatus: normalizeOperationalStatus(device.operationalStatus)
-    }));
-    if (localAssignments.length > 0) {
-      setAssignments(localAssignments);
+    const serverAssignments = await fetchServerAssignments().catch(() => []);
+    if (serverAssignments.length > 0) {
+      setAssignments(serverAssignments);
+      setConfiguredMonitorDevices(assignmentsToMonitorDevices(serverAssignments));
       return;
     }
 
-    const response = await fetch("/api/assignments", { cache: "no-store" });
-    const data = (await response.json()) as { assignments: VehicleAssignment[] };
-    setAssignments(data.assignments ?? []);
+    const localMonitorDevices = readMonitorDevices();
+    setConfiguredMonitorDevices(localMonitorDevices);
+    setAssignments(monitorDevicesToAssignments(localMonitorDevices));
   }
 
   async function loadTraccarDevices() {
@@ -1062,6 +1066,33 @@ export default function Home() {
   );
 }
 
+async function fetchServerAssignments() {
+  const response = await fetch("/api/assignments", { cache: "no-store" });
+  const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
+  if (!response.ok) throw new Error(data.error ?? "No se pudieron cargar las asignaciones");
+  return data.assignments ?? [];
+}
+
+function assignmentsToMonitorDevices(assignments: VehicleAssignment[]): MonitorDevice[] {
+  return assignments
+    .filter((assignment) => Number.isFinite(Number(assignment.deviceId)) && assignment.internalNumber && assignment.assignedLineId)
+    .map((assignment) => ({
+      deviceId: Number(assignment.deviceId),
+      internalNumber: assignment.internalNumber,
+      assignedLineId: assignment.assignedLineId,
+      operationalStatus: normalizeOperationalStatus(assignment.operationalStatus)
+    }));
+}
+
+function monitorDevicesToAssignments(devices: MonitorDevice[]): VehicleAssignment[] {
+  return devices.map((device) => ({
+    deviceId: device.deviceId,
+    internalNumber: device.internalNumber,
+    label: `Colectivo ${device.internalNumber}`,
+    assignedLineId: device.assignedLineId,
+    operationalStatus: normalizeOperationalStatus(device.operationalStatus)
+  }));
+}
 function readSelectedDeviceId() {
   if (typeof window === "undefined") return null;
 
