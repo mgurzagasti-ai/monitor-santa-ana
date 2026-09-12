@@ -174,7 +174,8 @@
 
 .list {
   display: flex;
-  max-height: min(420px, calc(100vh - 260px));
+  height: min(420px, calc(100vh - 260px));
+  flex-shrink: 0;
   overflow-y: auto;
   padding-right: 2px;
   flex-direction: column;
