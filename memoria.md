@@ -520,3 +520,17 @@ pm.cmd run build termino correctamente.
 - Android 1.1.12 ya reconoce `"passed"` y muestra `Alejandose`, sin recompilar APK.
 - Verificacion realizada antes de actualizar memoria: suite `95/95` OK y build OK.
 - Pendiente: validar comportamiento real en produccion.
+
+## 2026-09-12 - Cierre diagnostico de flota monitor
+
+- El monitor administrativo ahora usa `/api/assignments` del servidor como fuente principal de las unidades, no `localStorage`.
+- `localStorage` (`santaAnaMonitorDevices`) queda solamente como fallback/compatibilidad.
+- Se eliminaron correctamente 6 assignments huerfanos antiguos: `17752`, `18310`, `18323`, `18325`, `18327`, `18429`.
+- Resultado de limpieza confirmado: `totalBefore=60`, `removed=6`, `totalAfter=54`.
+- Traccar tiene actualmente 55 GPS `santaXX`.
+- Actualmente hay 54 assignments.
+- `santa25` / `deviceId 26` esta actualmente sin assignment.
+- El usuario va a comparar fisicamente el listado GPS <-> interno y corregira desde el monitor las asignaciones que correspondan.
+- No ejecutar automaticamente ninguna correccion del interno `751`.
+- El listado completo de colectivos ya se visualiza correctamente en el panel Flota del monitor.
+- Mantener el arreglo de scroll/lista existente.
