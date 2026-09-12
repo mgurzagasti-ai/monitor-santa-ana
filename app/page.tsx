@@ -140,6 +140,14 @@ type DeviceConfirmation = {
 
 type PendingConfirmation = AssignmentConfirmation | DeviceConfirmation;
 
+type CleanupResult = {
+  totalBefore: number | null;
+  removed: number;
+  removedDeviceIds: number[];
+  totalAfter: number | null;
+  error?: string;
+};
+
 export default function Home() {
   const [fleet, setFleet] = useState<FleetResponse>({ vehicles: [], updatedAt: "" });
   const [lineRoutes, setLineRoutes] = useState<LineRoute[]>([]);
@@ -159,6 +167,9 @@ export default function Home() {
   const [selectedLineRouteIds, setSelectedLineRouteIds] = useState<string[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [assignmentMessage, setAssignmentMessage] = useState("");
+  const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null);
+  const [cleanupDone, setCleanupDone] = useState(false);
+  const [cleaningAssignments, setCleaningAssignments] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [stopDraft, setStopDraft] = useState<StopDraft>({
     name: "",
@@ -670,6 +681,33 @@ export default function Home() {
     }
   }
 
+  async function cleanupOldAssignments() {
+    const confirmed = window.confirm("Eliminar solamente las 6 asignaciones antiguas confirmadas?");
+    if (!confirmed) return;
+
+    setCleaningAssignments(true);
+    setCleanupResult(null);
+    try {
+      const response = await fetch("/api/assignments/cleanup-orphans", { method: "POST" });
+      const data = (await response.json()) as CleanupResult;
+      if (!response.ok) throw new Error(data.error ?? "No se pudo limpiar asignaciones antiguas");
+
+      setCleanupResult(data);
+      setCleanupDone(true);
+      await loadFleet();
+    } catch (error) {
+      setCleanupResult({
+        totalBefore: null,
+        removed: 0,
+        removedDeviceIds: [],
+        totalAfter: null,
+        error: error instanceof Error ? error.message : "No se pudo limpiar asignaciones antiguas"
+      });
+    } finally {
+      setCleaningAssignments(false);
+    }
+  }
+
   useEffect(() => {
     const storedDeviceId = readSelectedDeviceId();
     if (storedDeviceId) {
@@ -748,6 +786,24 @@ export default function Home() {
         </section>
 
         {fleet.error ? <div className={styles.error}>{fleet.error}</div> : null}
+
+        <section className={styles.assignmentPanel}>
+          <div className={styles.sectionHeader}>
+            <span>Limpieza temporal</span>
+            <small>{cleanupDone ? "Ejecutada" : cleaningAssignments ? "Procesando" : "6 antiguas"}</small>
+          </div>
+          <button className={styles.secondaryButton} onClick={cleanupOldAssignments} disabled={cleaningAssignments || cleanupDone}>
+            <Trash2 size={17} />
+            <span>Limpiar 6 asignaciones antiguas</span>
+          </button>
+          {cleanupResult ? (
+            <p className={cleanupResult.error ? styles.error : styles.editorHint}>
+              {cleanupResult.error
+                ? cleanupResult.error
+                : `totalBefore: ${cleanupResult.totalBefore} | removed: ${cleanupResult.removed} | removedDeviceIds: ${cleanupResult.removedDeviceIds.join(", ") || "-"} | totalAfter: ${cleanupResult.totalAfter}`}
+            </p>
+          ) : null}
+        </section>
 
         <section className={styles.list}>
           {fleetListVehicles.map((vehicle) => (
