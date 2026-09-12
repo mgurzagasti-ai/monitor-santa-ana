@@ -177,18 +177,17 @@ export default function Home() {
   }, [lineRoutes]);
 
   const fleetListVehicles = useMemo<FleetListVehicle[]>(() => {
+    const fallbackVehicles = fleet.vehicles.map((vehicle) => ({
+      ...vehicle,
+      internalNumber: vehicle.internalNumber ?? "",
+      assignedLineId: vehicle.assignedLineId ?? "",
+      operationalStatus: normalizeOperationalStatus(vehicle.operationalStatus),
+      hasPosition: true
+    }));
     const monitorDevices = readMonitorDevices();
-    if (monitorDevices.length === 0) {
-      return fleet.vehicles.map((vehicle) => ({
-        ...vehicle,
-        internalNumber: vehicle.internalNumber ?? "",
-        assignedLineId: vehicle.assignedLineId ?? "",
-        operationalStatus: normalizeOperationalStatus(vehicle.operationalStatus),
-        hasPosition: true
-      }));
-    }
+    if (monitorDevices.length === 0) return fallbackVehicles;
 
-    return monitorDevices.map((device) => {
+    const configuredVehicles = monitorDevices.map((device) => {
       const vehicle = fleet.vehicles.find((row) => row.deviceId === device.deviceId);
       if (vehicle) {
         return {
@@ -213,6 +212,8 @@ export default function Home() {
         hasPosition: false
       };
     });
+
+    return configuredVehicles.length > 0 ? configuredVehicles : fallbackVehicles;
   }, [fleet.vehicles, lineRoutesWithPaths]);
 
   const selectedVehicle = useMemo(() => {
