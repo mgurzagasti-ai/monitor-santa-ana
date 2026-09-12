@@ -41,6 +41,17 @@ type FleetVehicle = {
   };
 };
 
+type FleetListVehicle = Omit<Partial<FleetVehicle>, "deviceId" | "label" | "line" | "color"> & {
+  deviceId: number;
+  label: string;
+  line: string;
+  color: string;
+  internalNumber: string;
+  assignedLineId: string;
+  operationalStatus: OperationalStatus;
+  hasPosition: boolean;
+};
+
 type FleetResponse = {
   vehicles: FleetVehicle[];
   updatedAt: string;
@@ -161,13 +172,56 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const selectedVehicle = useMemo(() => {
-    return fleet.vehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? fleet.vehicles[0] ?? null;
-  }, [fleet.vehicles, selectedDeviceId]);
-
   const lineRoutesWithPaths = useMemo(() => {
     return lineRoutes.filter((line) => line.paths.length > 0);
   }, [lineRoutes]);
+
+  const fleetListVehicles = useMemo<FleetListVehicle[]>(() => {
+    const monitorDevices = readMonitorDevices();
+    if (monitorDevices.length === 0) {
+      return fleet.vehicles.map((vehicle) => ({
+        ...vehicle,
+        internalNumber: vehicle.internalNumber ?? "",
+        assignedLineId: vehicle.assignedLineId ?? "",
+        operationalStatus: normalizeOperationalStatus(vehicle.operationalStatus),
+        hasPosition: true
+      }));
+    }
+
+    return monitorDevices.map((device) => {
+      const vehicle = fleet.vehicles.find((row) => row.deviceId === device.deviceId);
+      if (vehicle) {
+        return {
+          ...vehicle,
+          internalNumber: vehicle.internalNumber || device.internalNumber,
+          assignedLineId: vehicle.assignedLineId || device.assignedLineId,
+          operationalStatus: normalizeOperationalStatus(vehicle.operationalStatus ?? device.operationalStatus),
+          hasPosition: true
+        };
+      }
+
+      const assignedLine = lineRoutesWithPaths.find((line) => line.id === device.assignedLineId);
+      return {
+        deviceId: device.deviceId,
+        label: `Colectivo ${device.internalNumber}`,
+        line: assignedLine?.number ?? "-",
+        color: assignedLine?.color ?? "#f57c00",
+        internalNumber: device.internalNumber,
+        assignedLineId: device.assignedLineId,
+        assignedLineName: assignedLine?.name ?? "",
+        operationalStatus: normalizeOperationalStatus(device.operationalStatus),
+        hasPosition: false
+      };
+    });
+  }, [fleet.vehicles, lineRoutesWithPaths]);
+
+  const selectedVehicle = useMemo(() => {
+    return fleetListVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? fleetListVehicles[0] ?? null;
+  }, [fleetListVehicles, selectedDeviceId]);
+
+  const selectedPositionVehicle = useMemo(() => {
+    return fleet.vehicles.find((vehicle) => vehicle.deviceId === selectedVehicle?.deviceId) ?? null;
+  }, [fleet.vehicles, selectedVehicle?.deviceId]);
 
   const visibleLineRoutes = useMemo(() => {
     if (!showLineRoutes) return [];
@@ -182,16 +236,16 @@ export default function Home() {
   }, [lineStops, selectedLineRouteIds, showLineStops]);
 
   const selectedVehicleStops = useMemo(() => {
-    if (!selectedVehicle?.assignedLineId) return [];
+    if (!selectedPositionVehicle?.assignedLineId) return [];
     return lineStops
-      .filter((stop) => stop.lineId === selectedVehicle.assignedLineId)
+      .filter((stop) => stop.lineId === selectedPositionVehicle.assignedLineId)
       .map((stop) => ({
         ...stop,
-        distanceMeters: distanceMeters(selectedVehicle.latitude, selectedVehicle.longitude, stop.latitude, stop.longitude)
+        distanceMeters: distanceMeters(selectedPositionVehicle.latitude, selectedPositionVehicle.longitude, stop.latitude, stop.longitude)
       }))
       .sort((a, b) => a.distanceMeters - b.distanceMeters)
       .slice(0, 4);
-  }, [lineStops, selectedVehicle]);
+  }, [lineStops, selectedPositionVehicle]);
 
   const selectedAssignment = useMemo(() => {
     if (!selectedVehicle) return null;
@@ -462,12 +516,16 @@ export default function Home() {
       setSelectedDeviceId((currentDeviceId) => {
         const storedDeviceId = readSelectedDeviceId();
         const preferredDeviceId = currentDeviceId ?? storedDeviceId;
-        if (preferredDeviceId && data.vehicles.some((vehicle) => vehicle.deviceId === preferredDeviceId)) {
+        const configuredDeviceIds = monitorDevices.map((device) => device.deviceId);
+        if (
+          preferredDeviceId &&
+          (data.vehicles.some((vehicle) => vehicle.deviceId === preferredDeviceId) || configuredDeviceIds.includes(preferredDeviceId))
+        ) {
           saveSelectedDeviceId(preferredDeviceId);
           return preferredDeviceId;
         }
 
-        const fallbackDeviceId = data.vehicles[0]?.deviceId ?? null;
+        const fallbackDeviceId = configuredDeviceIds[0] ?? data.vehicles[0]?.deviceId ?? null;
         saveSelectedDeviceId(fallbackDeviceId);
         return fallbackDeviceId;
       });
@@ -666,7 +724,7 @@ export default function Home() {
         </header>
 
         <section className={styles.statusGrid}>
-          <Metric icon={<Activity size={18} />} label="Unidades" value={fleet.vehicles.length.toString()} />
+          <Metric icon={<Activity size={18} />} label="Unidades" value={fleetListVehicles.length.toString()} />
           <Metric icon={<Map size={18} />} label="Lineas" value={lineRoutesWithPaths.length.toString()} />
           <button className={styles.metricButton} onClick={() => setShowLineRoutes((value) => !value)}>
             {showLineRoutes ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -687,10 +745,10 @@ export default function Home() {
         {fleet.error ? <div className={styles.error}>{fleet.error}</div> : null}
 
         <section className={styles.list}>
-          {fleet.vehicles.map((vehicle) => (
+          {fleetListVehicles.map((vehicle) => (
             <button
               key={vehicle.deviceId}
-              className={`${styles.vehicle} ${selectedVehicle?.deviceId === vehicle.deviceId ? styles.selected : ""}`}
+              className={`${styles.vehicle} ${selectedDeviceId === vehicle.deviceId ? styles.selected : ""}`}
               onClick={() => selectVehicle(vehicle.deviceId)}
             >
               <span className={styles.badge} style={{ background: vehicle.color }}>
@@ -698,9 +756,9 @@ export default function Home() {
               </span>
               <span className={styles.vehicleText}>
                 <strong>{vehicle.label}</strong>
-                <small>{formatDate(vehicle.fixTime)} - {formatOperationalStatus(vehicle.operationalStatus)}</small>
+                <small>{vehicle.hasPosition && vehicle.fixTime ? formatDate(vehicle.fixTime) : "Sin posicion GPS"} - {formatOperationalStatus(vehicle.operationalStatus)}</small>
               </span>
-              <span className={styles.speed}>{Math.round(vehicle.speedKmh)} km/h</span>
+              <span className={styles.speed}>{vehicle.hasPosition && typeof vehicle.speedKmh === "number" ? `${Math.round(vehicle.speedKmh)} km/h` : "Sin GPS"}</span>
             </button>
           ))}
         </section>
@@ -778,25 +836,25 @@ export default function Home() {
           </section>
         ) : null}
 
-        {selectedVehicle?.gps ? (
+        {selectedPositionVehicle?.gps ? (
           <section className={styles.gpsPanel}>
             <div className={styles.sectionHeader}>
               <span>Estado GPS</span>
-              <small>{selectedVehicle.gps.fresh ? "Reciente" : "Viejo"}</small>
+              <small>{selectedPositionVehicle.gps.fresh ? "Reciente" : "Viejo"}</small>
             </div>
-            <div className={`${styles.gpsStatus} ${selectedVehicle.gps.moving ? styles.gpsOk : styles.gpsWarn}`}>
-              {selectedVehicle.gps.status}
+            <div className={`${styles.gpsStatus} ${selectedPositionVehicle.gps.moving ? styles.gpsOk : styles.gpsWarn}`}>
+              {selectedPositionVehicle.gps.status}
             </div>
             <div className={styles.gpsGrid}>
-              <Metric icon={<Satellite size={16} />} label="Satelites" value={formatNullable(selectedVehicle.gps.satellites)} />
-              <Metric icon={<Power size={16} />} label="Ignicion" value={selectedVehicle.gps.ignition ? "Si" : "No"} />
-              <Metric icon={<Battery size={16} />} label="Bateria" value={formatBattery(selectedVehicle.gps.battery)} />
-              <Metric icon={<Clock size={16} />} label="Reporte" value={formatAge(selectedVehicle.gps.ageSeconds)} />
+              <Metric icon={<Satellite size={16} />} label="Satelites" value={formatNullable(selectedPositionVehicle.gps.satellites)} />
+              <Metric icon={<Power size={16} />} label="Ignicion" value={selectedPositionVehicle.gps.ignition ? "Si" : "No"} />
+              <Metric icon={<Battery size={16} />} label="Bateria" value={formatBattery(selectedPositionVehicle.gps.battery)} />
+              <Metric icon={<Clock size={16} />} label="Reporte" value={formatAge(selectedPositionVehicle.gps.ageSeconds)} />
             </div>
           </section>
         ) : null}
 
-        {selectedVehicle ? (
+        {selectedPositionVehicle ? (
           <section className={styles.stopsPanel}>
             <div className={styles.sectionHeader}>
               <span>Paradas cercanas</span>
@@ -925,7 +983,7 @@ export default function Home() {
         </section>
 
         <footer className={styles.footer}>
-          <Metric icon={<Gauge size={18} />} label="Velocidad" value={`${Math.round(selectedVehicle?.speedKmh ?? 0)} km/h`} />
+          <Metric icon={<Gauge size={18} />} label="Velocidad" value={selectedPositionVehicle ? `${Math.round(selectedPositionVehicle.speedKmh)} km/h` : "-"} />
           <Metric icon={<Clock size={18} />} label="Actualizado" value={fleet.updatedAt ? formatDate(fleet.updatedAt) : "-"} />
         </footer>
       </aside>
@@ -933,7 +991,7 @@ export default function Home() {
       <section className={styles.mapWrap}>
         <FleetMap
           vehicles={fleet.vehicles}
-          selectedDeviceId={selectedVehicle?.deviceId ?? null}
+          selectedDeviceId={selectedPositionVehicle?.deviceId ?? null}
           lineRoutes={visibleLineRoutes}
           lineStops={visibleLineStops}
           stopEditorEnabled={stopEditorOpen}
