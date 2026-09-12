@@ -37,6 +37,20 @@ export async function upsertAssignment(next: VehicleAssignment) {
   return next;
 }
 
+export async function removeAssignmentsByDeviceIds(deviceIds: number[]) {
+  const targetIds = new Set(deviceIds);
+  const assignments = await readAssignments();
+  const nextAssignments = assignments.filter((assignment) => !targetIds.has(assignment.deviceId));
+
+  await writeRedisAssignments(nextAssignments);
+  writeLocalAssignments(nextAssignments);
+
+  return {
+    assignments: nextAssignments,
+    removedAssignments: assignments.filter((assignment) => targetIds.has(assignment.deviceId))
+  };
+}
+
 function readLocalAssignments(): VehicleAssignment[] {
   if (!existsSync(assignmentsFile)) return [];
 
