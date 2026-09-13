@@ -534,3 +534,25 @@ pm.cmd run build termino correctamente.
 - No ejecutar automaticamente ninguna correccion del interno `751`.
 - El listado completo de colectivos ya se visualiza correctamente en el panel Flota del monitor.
 - Mantener el arreglo de scroll/lista existente.
+
+## 2026-09-13 - Privacidad y solicitud de eliminacion de cuenta
+
+- Se agregaron paginas publicas para requisitos de Google Play:
+  - `/privacy`: Politica de Privacidad de Santa Ana Bus.
+  - `/delete-account`: inicio de solicitud de eliminacion de cuenta.
+- Se agrego `POST /api/public/delete-account-request`.
+- La solicitud pide email y confirmacion explicita.
+- La API valida formato de email y aplica rate limit basico por IP y por hash de email.
+- La solicitud queda registrada con:
+  - `id`;
+  - `email`;
+  - `status = PENDING`;
+  - `createdAt`;
+  - `updatedAt`;
+  - hash del user-agent.
+- En produccion la persistencia requiere Upstash Redis (`UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`).
+- El respaldo local solo se usa en desarrollo cuando Redis no esta configurado.
+- Esta primera etapa no elimina cuentas de Appwrite.
+- No se agrego ni requiere `APPWRITE_API_KEY`.
+- La eliminacion definitiva queda para una segunda etapa con verificacion de identidad.
+- Las rutas `/privacy`, `/delete-account` y `/api/public/delete-account-request` quedan publicas y fuera del Basic Auth del monitor.
