@@ -556,3 +556,11 @@ pm.cmd run build termino correctamente.
 - No se agrego ni requiere `APPWRITE_API_KEY`.
 - La eliminacion definitiva queda para una segunda etapa con verificacion de identidad.
 - Las rutas `/privacy`, `/delete-account` y `/api/public/delete-account-request` quedan publicas y fuera del Basic Auth del monitor.
+
+## 2026-09-14 - Fleet cache TTL para GPS cada 15s
+
+- Se cambio el default de `FLEET_CACHE_TTL_SECONDS` en `app/data/fleet.ts` de 20s a 15s.
+- Motivo: los GPS fisicos pasan de reportar cada 30s a cada 15s; el snapshot compartido puede aprovechar la nueva cadencia sin aumentar el polling de clientes.
+- No se modificaron CDN, ETA, stale/fresh, polling Android, polling monitor, rate limits ni Traccar.
+- Verificacion: `npm test` OK (95/95) y `npm run build` OK.
+- Localmente `.env.local` no define `FLEET_CACHE_TTL_SECONDS`; `.env.example` sigue documentando 20s. La consulta a variables de Vercel no pudo completarse desde este entorno porque el CLI no esta instalado y `npm/npx vercel env ls` falla con `Invalid Version` antes de listar variables.
