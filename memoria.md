@@ -564,3 +564,18 @@ pm.cmd run build termino correctamente.
 - No se modificaron CDN, ETA, stale/fresh, polling Android, polling monitor, rate limits ni Traccar.
 - Verificacion: `npm test` OK (95/95) y `npm run build` OK.
 - Localmente `.env.local` no define `FLEET_CACHE_TTL_SECONDS`; `.env.example` sigue documentando 20s. La consulta a variables de Vercel no pudo completarse desde este entorno porque el CLI no esta instalado y `npm/npx vercel env ls` falla con `Invalid Version` antes de listar variables.
+
+## 2026-09-14 - Estado confirmado de intervalos y commits
+
+- Backend `HEAD` y `origin/main`: `c84d328 Tune fleet cache TTL for 15s GPS reports`.
+- Android `HEAD` y `origin/main`: `5e97ea6 Prepare Android 1.1.15 release`.
+- GPS fisicos configurados para reportar cada `15 s`.
+- Monitor web: polling fleet cada `30 s` en `app/page.tsx`.
+- Android fleet: `USER_LOCATION_REFRESH_MS = 20_000L` en `MapScreen.kt`.
+- Android stop-arrivals/ETA: `STOP_ARRIVALS_REFRESH_MS = 15_000L` en `MapScreen.kt`.
+- Backend fleet cache TTL default: `15 s`; stale cache: `300 s`; refresh lock: `20 s`.
+- CDN fleet: `s-maxage=5, stale-while-revalidate=25`.
+- Android `1.1.15` es el estado actual preparado.
+- El monitor web se dejo deliberadamente en `30 s`; no asumir que todos los clientes deben consultar cada `15 s`.
+- `.env.example` todavia documenta `FLEET_CACHE_TTL_SECONDS=20`; queda pendiente alinearlo a `15`, pero no se cambio ahora.
+- Se creo `HISTORIAL_PROYECTO.md` como resumen tecnico cronologico para retomar el proyecto sin depender del historial del chat.
