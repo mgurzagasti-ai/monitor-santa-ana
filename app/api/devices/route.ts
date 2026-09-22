@@ -33,9 +33,7 @@ export async function POST(request: NextRequest) {
     const uniqueId = String(body.uniqueId ?? "").trim();
     const name = String(body.name ?? "").trim();
     const internalNumber = String(body.internalNumber ?? "").trim();
-    const assignedLineId = String(body.assignedLineId ?? "").trim();
-    const operationalStatus = normalizeOperationalStatus(body.operationalStatus);
-    const line = lineRoutes.find((row) => row.id === assignedLineId);
+    const requestedLineId = String(body.assignedLineId ?? "").trim();
 
     if (!Number.isFinite(deviceId) || deviceId <= 0) {
       return NextResponse.json({ error: "Falta seleccionar un GPS de Traccar" }, { status: 400 });
@@ -45,22 +43,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Falta numero de interno" }, { status: 400 });
     }
 
-    if (!line) {
-      return NextResponse.json({ error: "Linea no encontrada" }, { status: 400 });
-    }
-
     const assignments = await readAssignments();
-    const duplicatedAssignment = assignments.find(
+    const replacedAssignment = assignments.find(
       (assignment) =>
         assignment.deviceId !== deviceId &&
         sameInternalNumber(assignment.internalNumber, internalNumber)
     );
+    const assignedLineId = replacedAssignment?.assignedLineId || requestedLineId;
+    const operationalStatus = replacedAssignment?.operationalStatus ?? normalizeOperationalStatus(body.operationalStatus);
+    const line = lineRoutes.find((row) => row.id === assignedLineId);
 
-    if (duplicatedAssignment) {
-      return NextResponse.json(
-        { error: `El interno ${internalNumber} ya esta asignado a ${duplicatedAssignment.label}` },
-        { status: 409 }
-      );
+    if (!line) {
+      return NextResponse.json({ error: "Linea no encontrada" }, { status: 400 });
     }
 
     const config = getConfig();
@@ -84,7 +78,12 @@ export async function POST(request: NextRequest) {
     });
     await invalidateFleetCache();
 
-    return NextResponse.json({ device, assignment, updatedAt: new Date().toISOString() });
+    return NextResponse.json({
+      device,
+      assignment,
+      assignments: await readAssignments(),
+      updatedAt: new Date().toISOString()
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "No se pudo guardar el GPS" },

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { isRedisConfigured, redisCommand } from "./redis";
+import { reconcileAssignment } from "./assignmentReconciliation";
 
 export type VehicleAssignment = {
   deviceId: number;
@@ -24,19 +25,12 @@ export async function readAssignments(): Promise<VehicleAssignment[]> {
 
 export async function upsertAssignment(next: VehicleAssignment) {
   const assignments = await readAssignments();
-  const index = assignments.findIndex((assignment) => assignment.deviceId === next.deviceId);
+  const nextAssignments = reconcileAssignment(assignments, next);
 
-  if (index >= 0) {
-    assignments[index] = next;
-  } else {
-    assignments.push(next);
-  }
-
-  await writeRedisAssignments(assignments);
-  writeLocalAssignments(assignments);
+  await writeRedisAssignments(nextAssignments);
+  writeLocalAssignments(nextAssignments);
   return next;
 }
-
 
 function readLocalAssignments(): VehicleAssignment[] {
   if (!existsSync(assignmentsFile)) return [];

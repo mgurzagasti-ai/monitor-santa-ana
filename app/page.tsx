@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, PanelLeftClose, PanelLeftOpen, Plus, Power, RefreshCcw, Save, Satellite, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { compareInternalNumbers } from "./data/vehicleListSort";
 
 const FleetMap = dynamic(() => import("./ui/FleetMap"), { ssr: false });
 const selectedDeviceStorageKey = "santaAnaSelectedDeviceId";
@@ -136,6 +137,8 @@ type DeviceConfirmation = {
   uniqueId: string;
   internalNumber: string;
   assignedLineId: string;
+  replacedGpsLabel?: string;
+  previousInternalNumber?: string;
 };
 
 type PendingConfirmation = AssignmentConfirmation | DeviceConfirmation;
@@ -187,7 +190,7 @@ export default function Home() {
       hasPosition: true
     }));
     const monitorDevices = configuredMonitorDevices.length > 0 ? configuredMonitorDevices : readMonitorDevices();
-    if (monitorDevices.length === 0) return fallbackVehicles;
+    if (monitorDevices.length === 0) return fallbackVehicles.sort(compareInternalNumbers);
 
     const configuredVehicles = monitorDevices.map((device) => {
       const vehicle = fleet.vehicles.find((row) => row.deviceId === device.deviceId);
@@ -215,7 +218,7 @@ export default function Home() {
       };
     });
 
-    return configuredVehicles.length > 0 ? configuredVehicles : fallbackVehicles;
+    return (configuredVehicles.length > 0 ? configuredVehicles : fallbackVehicles).sort(compareInternalNumbers);
   }, [configuredMonitorDevices, fleet.vehicles, lineRoutesWithPaths]);
 
   const selectedVehicle = useMemo(() => {
@@ -605,11 +608,13 @@ export default function Home() {
       return;
     }
 
-    const duplicatedVehicle = findInternalNumberConflict(internalNumber, traccarDevice.id, assignments, fleet.vehicles);
-    if (duplicatedVehicle) {
-      setDeviceMessage(`El interno ${internalNumber} ya esta asignado a ${duplicatedVehicle.label}.`);
-      return;
-    }
+    const replacedAssignment = assignments.find(
+      (assignment) => assignment.deviceId !== traccarDevice.id && sameInternalNumber(assignment.internalNumber, internalNumber)
+    );
+    const currentGpsAssignment = assignments.find((assignment) => assignment.deviceId === traccarDevice.id);
+    const replacedGps = replacedAssignment
+      ? traccarDevices.find((device) => device.id === replacedAssignment.deviceId)
+      : null;
 
     setDeviceMessage("");
     setPendingConfirmation({
@@ -618,7 +623,12 @@ export default function Home() {
       gpsLabel: traccarDevice.name,
       uniqueId: traccarDevice.uniqueId,
       internalNumber,
-      assignedLineId
+      assignedLineId,
+      replacedGpsLabel: replacedAssignment ? replacedGps?.name || `GPS ${replacedAssignment.deviceId}` : undefined,
+      previousInternalNumber:
+        currentGpsAssignment && !sameInternalNumber(currentGpsAssignment.internalNumber, internalNumber)
+          ? currentGpsAssignment.internalNumber
+          : undefined
     });
   }
 
@@ -638,17 +648,14 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nextDevice)
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
       if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el GPS");
 
-      const nextDevices = upsertMonitorDevice(nextDevice);
-      setAssignments(nextDevices.map((device) => ({
-        deviceId: device.deviceId,
-        internalNumber: device.internalNumber,
-        label: `Colectivo ${device.internalNumber}`,
-        assignedLineId: device.assignedLineId,
-        operationalStatus: normalizeOperationalStatus(device.operationalStatus)
-      })));
+      const nextAssignments = data.assignments ?? [];
+      const nextDevices = assignmentsToMonitorDevices(nextAssignments);
+      setAssignments(nextAssignments);
+      setConfiguredMonitorDevices(nextDevices);
+      writeMonitorDevices(nextDevices);
       selectVehicle(confirmation.deviceId);
       setDeviceMessage("GPS cargado para el monitor y la APK.");
       await loadFleet();
@@ -1048,6 +1055,18 @@ export default function Home() {
                       <dt>Interno</dt>
                       <dd>{pendingConfirmation.internalNumber}</dd>
                     </div>
+                    {pendingConfirmation.replacedGpsLabel ? (
+                      <div>
+                        <dt>GPS anterior</dt>
+                        <dd>{pendingConfirmation.replacedGpsLabel} (se desvinculara)</dd>
+                      </div>
+                    ) : null}
+                    {pendingConfirmation.previousInternalNumber ? (
+                      <div>
+                        <dt>Asociacion anterior del GPS</dt>
+                        <dd>Interno {pendingConfirmation.previousInternalNumber} (se reemplazara)</dd>
+                      </div>
+                    ) : null}
                   </dl>
                 </>
               )}
@@ -1146,6 +1165,10 @@ function upsertMonitorDevice(next: MonitorDevice) {
   return devices;
 }
 
+function writeMonitorDevices(devices: MonitorDevice[]) {
+  window.localStorage.setItem("santaAnaMonitorDevices", JSON.stringify(devices));
+}
+
 function normalizeOperationalStatus(value: unknown): OperationalStatus {
   return operationalStatusOptions.includes(value as OperationalStatus)
     ? (value as OperationalStatus)
@@ -1177,39 +1200,6 @@ function formatLineLabel(line: Pick<LineRoute, "name" | "number">) {
 function formatLineById(lines: LineRoute[], lineId: string) {
   const line = lines.find((row) => row.id === lineId);
   return line ? formatLineLabel(line) : lineId || "-";
-}
-
-function findInternalNumberConflict(
-  internalNumber: string,
-  currentDeviceId: number,
-  assignments: VehicleAssignment[],
-  vehicles: FleetVehicle[]
-) {
-  const localDevices = readMonitorDevices();
-  const candidates = [
-    ...assignments.map((assignment) => ({
-      deviceId: assignment.deviceId,
-      internalNumber: assignment.internalNumber,
-      label: assignment.label
-    })),
-    ...vehicles.map((vehicle) => ({
-      deviceId: vehicle.deviceId,
-      internalNumber: vehicle.internalNumber ?? "",
-      label: vehicle.label
-    })),
-    ...localDevices.map((device) => ({
-      deviceId: device.deviceId,
-      internalNumber: device.internalNumber,
-      label: `Colectivo ${device.internalNumber}`
-    }))
-  ];
-
-  return candidates.find(
-    (candidate) =>
-      candidate.deviceId !== currentDeviceId &&
-      candidate.internalNumber &&
-      sameInternalNumber(candidate.internalNumber, internalNumber)
-  ) ?? null;
 }
 
 function sameInternalNumber(current: string, next: string) {
