@@ -164,6 +164,9 @@ export default function Home() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [assignmentMessage, setAssignmentMessage] = useState("");
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [operatorPassword, setOperatorPassword] = useState("");
+  const [confirmationError, setConfirmationError] = useState("");
+  const [selectedFleetLineId, setSelectedFleetLineId] = useState("");
   const [stopDraft, setStopDraft] = useState<StopDraft>({
     name: "",
     lineId: "",
@@ -221,9 +224,19 @@ export default function Home() {
     return (configuredVehicles.length > 0 ? configuredVehicles : fallbackVehicles).sort(compareInternalNumbers);
   }, [configuredMonitorDevices, fleet.vehicles, lineRoutesWithPaths]);
 
+  const visibleFleetListVehicles = useMemo(() => {
+    if (!selectedFleetLineId) return fleetListVehicles;
+    return fleetListVehicles.filter((vehicle) => vehicle.assignedLineId === selectedFleetLineId);
+  }, [fleetListVehicles, selectedFleetLineId]);
+
+  const visibleFleetVehicles = useMemo(() => {
+    if (!selectedFleetLineId) return fleet.vehicles;
+    return fleet.vehicles.filter((vehicle) => vehicle.assignedLineId === selectedFleetLineId);
+  }, [fleet.vehicles, selectedFleetLineId]);
+
   const selectedVehicle = useMemo(() => {
-    return fleetListVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? fleetListVehicles[0] ?? null;
-  }, [fleetListVehicles, selectedDeviceId]);
+    return visibleFleetListVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? visibleFleetListVehicles[0] ?? null;
+  }, [selectedDeviceId, visibleFleetListVehicles]);
 
   const selectedPositionVehicle = useMemo(() => {
     return fleet.vehicles.find((vehicle) => vehicle.deviceId === selectedVehicle?.deviceId) ?? null;
@@ -284,6 +297,12 @@ export default function Home() {
   function selectVehicle(deviceId: number | null) {
     setSelectedDeviceId(deviceId);
     saveSelectedDeviceId(deviceId);
+  }
+
+  function closeConfirmation() {
+    setPendingConfirmation(null);
+    setOperatorPassword("");
+    setConfirmationError("");
   }
 
   function toggleLineRoute(lineId: string) {
@@ -404,6 +423,7 @@ export default function Home() {
     }
 
     setAssignmentMessage("");
+    setConfirmationError("");
     setPendingConfirmation({
       kind: "assignment",
       deviceId: selectedVehicle.deviceId,
@@ -617,6 +637,8 @@ export default function Home() {
       : null;
 
     setDeviceMessage("");
+    setOperatorPassword("");
+    setConfirmationError("");
     setPendingConfirmation({
       kind: "device",
       deviceId: traccarDevice.id,
@@ -632,7 +654,7 @@ export default function Home() {
     });
   }
 
-  async function saveMonitorDevice(confirmation: DeviceConfirmation) {
+  async function saveMonitorDevice(confirmation: DeviceConfirmation, password: string) {
     setSavingDevice(true);
     try {
       const nextDevice = {
@@ -646,7 +668,7 @@ export default function Home() {
       const response = await fetch("/api/devices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nextDevice)
+        body: JSON.stringify({ ...nextDevice, operatorPassword: password })
       });
       const data = (await response.json()) as { assignments?: VehicleAssignment[]; error?: string };
       if (!response.ok) throw new Error(data.error ?? "No se pudo guardar el GPS");
@@ -659,8 +681,12 @@ export default function Home() {
       selectVehicle(confirmation.deviceId);
       setDeviceMessage("GPS cargado para el monitor y la APK.");
       await loadFleet();
+      return true;
     } catch (error) {
-      setDeviceMessage(error instanceof Error ? error.message : "No se pudo guardar el GPS");
+      const message = error instanceof Error ? error.message : "No se pudo guardar el GPS";
+      setDeviceMessage(message);
+      setConfirmationError(message);
+      return false;
     } finally {
       setSavingDevice(false);
     }
@@ -670,11 +696,18 @@ export default function Home() {
     const confirmation = pendingConfirmation;
     if (!confirmation) return;
 
-    setPendingConfirmation(null);
     if (confirmation.kind === "assignment") {
+      closeConfirmation();
       await saveAssignment(confirmation);
     } else {
-      await saveMonitorDevice(confirmation);
+      if (!operatorPassword) {
+        setConfirmationError("Ingresa la contraseña de operador.");
+        return;
+      }
+
+      setConfirmationError("");
+      const saved = await saveMonitorDevice(confirmation, operatorPassword);
+      if (saved) closeConfirmation();
     }
   }
 
@@ -705,6 +738,15 @@ export default function Home() {
     setShowLineRoutes(true);
     setSelectedLineRouteIds([assignedLineId]);
   }, [selectedVehicle?.assignedLineId, selectedAssignment?.assignedLineId, selectedVehicle?.deviceId]);
+
+  useEffect(() => {
+    if (!selectedFleetLineId) return;
+    const selectedIsVisible = fleetListVehicles.some(
+      (vehicle) => vehicle.deviceId === selectedDeviceId && vehicle.assignedLineId === selectedFleetLineId
+    );
+    if (selectedIsVisible) return;
+    selectVehicle(fleetListVehicles.find((vehicle) => vehicle.assignedLineId === selectedFleetLineId)?.deviceId ?? null);
+  }, [fleetListVehicles, selectedDeviceId, selectedFleetLineId]);
 
   return (
     <main className={styles.shell}>
@@ -737,7 +779,7 @@ export default function Home() {
         </header>
 
         <section className={styles.statusGrid}>
-          <Metric icon={<Activity size={18} />} label="Unidades" value={fleetListVehicles.length.toString()} />
+          <Metric icon={<Activity size={18} />} label="Unidades" value={visibleFleetListVehicles.length.toString()} />
           <Metric icon={<Map size={18} />} label="Lineas" value={lineRoutesWithPaths.length.toString()} />
           <button className={styles.metricButton} onClick={() => setShowLineRoutes((value) => !value)}>
             {showLineRoutes ? <Eye size={18} /> : <EyeOff size={18} />}
@@ -759,7 +801,7 @@ export default function Home() {
 
 
         <section className={styles.list}>
-          {fleetListVehicles.map((vehicle) => (
+          {visibleFleetListVehicles.map((vehicle) => (
             <button
               key={vehicle.deviceId}
               className={`${styles.vehicle} ${selectedDeviceId === vehicle.deviceId ? styles.selected : ""}`}
@@ -1002,9 +1044,39 @@ export default function Home() {
         </footer>
       </aside>
 
+      <nav
+        className={`${styles.fleetFilterBar} ${sidebarOpen ? styles.fleetFilterBarSidebarOpen : ""}`}
+        aria-label="Filtrar flota por linea"
+      >
+        <button
+          type="button"
+          className={!selectedFleetLineId ? styles.fleetFilterActive : ""}
+          aria-pressed={!selectedFleetLineId}
+          onClick={() => setSelectedFleetLineId("")}
+        >
+          Todos
+        </button>
+        {lineRoutes.map((line) => {
+          const isActive = selectedFleetLineId === line.id;
+          return (
+            <button
+              key={line.id}
+              type="button"
+              className={isActive ? styles.fleetFilterActive : ""}
+              aria-pressed={isActive}
+              onClick={() => setSelectedFleetLineId(line.id)}
+              title={formatLineLabel(line)}
+            >
+              <span style={{ background: line.color }} />
+              {formatLineLabel(line)}
+            </button>
+          );
+        })}
+      </nav>
+
       <section className={styles.mapWrap}>
         <FleetMap
-          vehicles={fleet.vehicles}
+          vehicles={visibleFleetVehicles}
           selectedDeviceId={selectedPositionVehicle?.deviceId ?? null}
           lineRoutes={visibleLineRoutes}
           lineStops={visibleLineStops}
@@ -1020,7 +1092,7 @@ export default function Home() {
           <div className={styles.confirmationModal} role="dialog" aria-modal="true" aria-labelledby="assignment-confirm-title">
             <div className={styles.modalHeader}>
               <h2 id="assignment-confirm-title">Confirmar asignacion</h2>
-              <button type="button" onClick={() => setPendingConfirmation(null)} title="Cancelar">
+              <button type="button" onClick={closeConfirmation} title="Cancelar">
                 <X size={18} />
               </button>
             </div>
@@ -1070,14 +1142,31 @@ export default function Home() {
                   </dl>
                 </>
               )}
+              {pendingConfirmation.kind === "device" ? (
+                <label className={styles.field}>
+                  <span>Contraseña de operador</span>
+                  <input
+                    type="password"
+                    value={operatorPassword}
+                    onChange={(event) => {
+                      setOperatorPassword(event.target.value);
+                      setConfirmationError("");
+                    }}
+                    autoComplete="current-password"
+                    autoFocus
+                    disabled={savingDevice}
+                  />
+                </label>
+              ) : null}
+              {confirmationError ? <p className={styles.confirmationError}>{confirmationError}</p> : null}
             </div>
             <div className={styles.modalActions}>
-              <button type="button" className={styles.secondaryButton} onClick={() => setPendingConfirmation(null)}>
+              <button type="button" className={styles.secondaryButton} onClick={closeConfirmation} disabled={savingDevice}>
                 Cancelar
               </button>
-              <button type="button" className={styles.primaryButton} onClick={confirmPendingChange}>
+              <button type="button" className={styles.primaryButton} onClick={confirmPendingChange} disabled={savingDevice}>
                 <Save size={17} />
-                <span>Confirmar</span>
+                <span>{savingDevice ? "Validando..." : "Confirmar"}</span>
               </button>
             </div>
           </div>

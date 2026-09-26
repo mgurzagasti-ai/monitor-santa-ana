@@ -4,6 +4,7 @@ import { upsertFleetDevice } from "@/app/data/fleetDevices";
 import { invalidateFleetCache } from "@/app/data/fleet";
 import { fetchTraccarDevices, getConfig } from "@/app/api/traccar";
 import { lineRoutes } from "@/app/data/lineRoutes";
+import { validateAssignmentOperatorPassword } from "@/app/data/assignmentOperatorPassword";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
       internalNumber?: unknown;
       assignedLineId?: unknown;
       operationalStatus?: unknown;
+      operatorPassword?: unknown;
     };
     const deviceId = Number(body.deviceId);
     const uniqueId = String(body.uniqueId ?? "").trim();
@@ -41,6 +43,14 @@ export async function POST(request: NextRequest) {
 
     if (!internalNumber) {
       return NextResponse.json({ error: "Falta numero de interno" }, { status: 400 });
+    }
+
+    const passwordValidation = validateAssignmentOperatorPassword(body.operatorPassword);
+    if (passwordValidation === "not_configured") {
+      return NextResponse.json({ error: "La contraseña de operador no está configurada" }, { status: 503 });
+    }
+    if (passwordValidation === "invalid") {
+      return NextResponse.json({ error: "Contraseña de operador incorrecta" }, { status: 401 });
     }
 
     const assignments = await readAssignments();

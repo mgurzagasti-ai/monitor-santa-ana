@@ -6,6 +6,7 @@ import {
   type VehicleAssignment
 } from "@/app/data/assignments";
 import { invalidateFleetCache } from "@/app/data/fleet";
+import { validateAssignmentOperatorPassword } from "@/app/data/assignmentOperatorPassword";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const body = (await request.json()) as Partial<VehicleAssignment>;
+    const body = (await request.json()) as Partial<VehicleAssignment> & { operatorPassword?: unknown };
     const deviceId = Number(body.deviceId);
 
     if (!Number.isFinite(deviceId) || deviceId <= 0) {
@@ -41,6 +42,14 @@ export async function PATCH(request: NextRequest) {
 
     const internalNumberChanged = !currentAssignment || !sameInternalNumber(currentAssignment.internalNumber, internalNumber);
     if (internalNumberChanged) {
+      const passwordValidation = validateAssignmentOperatorPassword(body.operatorPassword);
+      if (passwordValidation === "not_configured") {
+        return NextResponse.json({ error: "La contraseña de operador no está configurada" }, { status: 503 });
+      }
+      if (passwordValidation === "invalid") {
+        return NextResponse.json({ error: "Contraseña de operador incorrecta" }, { status: 401 });
+      }
+
       const duplicatedAssignment = assignments.find(
         (assignment) =>
           assignment.deviceId !== deviceId &&
