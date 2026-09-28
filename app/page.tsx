@@ -8,6 +8,8 @@ import { compareInternalNumbers } from "./data/vehicleListSort";
 
 const FleetMap = dynamic(() => import("./ui/FleetMap"), { ssr: false });
 const selectedDeviceStorageKey = "santaAnaSelectedDeviceId";
+const groupedFleetLineNumbers = ["2", "4", "8"];
+const groupedFleetLinePrefix = "all:";
 
 type OperationalStatus = "EN_SERVICIO" | "FUERA_DE_SERVICIO" | "TALLER";
 
@@ -184,6 +186,14 @@ export default function Home() {
     return lineRoutes.filter((line) => line.paths.length > 0);
   }, [lineRoutes]);
 
+  const selectedFleetLineIds = useMemo(() => {
+    if (!selectedFleetLineId) return [];
+    if (!selectedFleetLineId.startsWith(groupedFleetLinePrefix)) return [selectedFleetLineId];
+
+    const lineNumber = selectedFleetLineId.slice(groupedFleetLinePrefix.length);
+    return lineRoutes.filter((line) => line.number === lineNumber).map((line) => line.id);
+  }, [lineRoutes, selectedFleetLineId]);
+
   const fleetListVehicles = useMemo<FleetListVehicle[]>(() => {
     const fallbackVehicles = fleet.vehicles.map((vehicle) => ({
       ...vehicle,
@@ -225,14 +235,14 @@ export default function Home() {
   }, [configuredMonitorDevices, fleet.vehicles, lineRoutesWithPaths]);
 
   const visibleFleetListVehicles = useMemo(() => {
-    if (!selectedFleetLineId) return fleetListVehicles;
-    return fleetListVehicles.filter((vehicle) => vehicle.assignedLineId === selectedFleetLineId);
-  }, [fleetListVehicles, selectedFleetLineId]);
+    if (selectedFleetLineIds.length === 0) return fleetListVehicles;
+    return fleetListVehicles.filter((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId));
+  }, [fleetListVehicles, selectedFleetLineIds]);
 
   const visibleFleetVehicles = useMemo(() => {
-    if (!selectedFleetLineId) return fleet.vehicles;
-    return fleet.vehicles.filter((vehicle) => vehicle.assignedLineId === selectedFleetLineId);
-  }, [fleet.vehicles, selectedFleetLineId]);
+    if (selectedFleetLineIds.length === 0) return fleet.vehicles;
+    return fleet.vehicles.filter((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId ?? ""));
+  }, [fleet.vehicles, selectedFleetLineIds]);
 
   const selectedVehicle = useMemo(() => {
     return visibleFleetListVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? visibleFleetListVehicles[0] ?? null;
@@ -742,11 +752,11 @@ export default function Home() {
   useEffect(() => {
     if (!selectedFleetLineId) return;
     const selectedIsVisible = fleetListVehicles.some(
-      (vehicle) => vehicle.deviceId === selectedDeviceId && vehicle.assignedLineId === selectedFleetLineId
+      (vehicle) => vehicle.deviceId === selectedDeviceId && selectedFleetLineIds.includes(vehicle.assignedLineId)
     );
     if (selectedIsVisible) return;
-    selectVehicle(fleetListVehicles.find((vehicle) => vehicle.assignedLineId === selectedFleetLineId)?.deviceId ?? null);
-  }, [fleetListVehicles, selectedDeviceId, selectedFleetLineId]);
+    selectVehicle(fleetListVehicles.find((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId))?.deviceId ?? null);
+  }, [fleetListVehicles, selectedDeviceId, selectedFleetLineId, selectedFleetLineIds]);
 
   return (
     <main className={styles.shell}>
@@ -1056,6 +1066,21 @@ export default function Home() {
         >
           Todos
         </button>
+        {groupedFleetLineNumbers.map((lineNumber) => {
+          const filterId = `${groupedFleetLinePrefix}${lineNumber}`;
+          const isActive = selectedFleetLineId === filterId;
+          return (
+            <button
+              key={filterId}
+              type="button"
+              className={isActive ? styles.fleetFilterActive : ""}
+              aria-pressed={isActive}
+              onClick={() => setSelectedFleetLineId(filterId)}
+            >
+              {lineNumber} - Todas
+            </button>
+          );
+        })}
         {lineRoutes.map((line) => {
           const isActive = selectedFleetLineId === line.id;
           return (
