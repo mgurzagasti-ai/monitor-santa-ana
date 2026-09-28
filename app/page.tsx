@@ -169,6 +169,7 @@ export default function Home() {
   const [operatorPassword, setOperatorPassword] = useState("");
   const [confirmationError, setConfirmationError] = useState("");
   const [selectedFleetLineId, setSelectedFleetLineId] = useState("");
+  const [fleetSearch, setFleetSearch] = useState("");
   const [stopDraft, setStopDraft] = useState<StopDraft>({
     name: "",
     lineId: "",
@@ -238,6 +239,12 @@ export default function Home() {
     if (selectedFleetLineIds.length === 0) return fleetListVehicles;
     return fleetListVehicles.filter((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId));
   }, [fleetListVehicles, selectedFleetLineIds]);
+
+  const searchedFleetListVehicles = useMemo(() => {
+    const search = fleetSearch.trim().toLowerCase();
+    if (!search) return visibleFleetListVehicles;
+    return visibleFleetListVehicles.filter((vehicle) => vehicle.internalNumber.toLowerCase().includes(search));
+  }, [fleetSearch, visibleFleetListVehicles]);
 
   const visibleFleetVehicles = useMemo(() => {
     if (selectedFleetLineIds.length === 0) return fleet.vehicles;
@@ -807,11 +814,20 @@ export default function Home() {
           </button>
         </section>
 
+        <label className={styles.field}>
+          <input
+            value={fleetSearch}
+            onChange={(event) => setFleetSearch(event.target.value)}
+            placeholder="Buscar colectivo..."
+            aria-label="Buscar colectivo por numero interno"
+          />
+        </label>
+
         {fleet.error ? <div className={styles.error}>{fleet.error}</div> : null}
 
 
         <section className={styles.list}>
-          {visibleFleetListVehicles.map((vehicle) => (
+          {searchedFleetListVehicles.map((vehicle) => (
             <button
               key={vehicle.deviceId}
               className={`${styles.vehicle} ${selectedDeviceId === vehicle.deviceId ? styles.selected : ""}`}
@@ -827,6 +843,9 @@ export default function Home() {
               <span className={styles.speed}>{vehicle.hasPosition && typeof vehicle.speedKmh === "number" ? `${Math.round(vehicle.speedKmh)} km/h` : "Sin GPS"}</span>
             </button>
           ))}
+          {fleetSearch.trim() && searchedFleetListVehicles.length === 0 ? (
+            <p className={styles.emptyState}>No se encontró el colectivo</p>
+          ) : null}
         </section>
 
         {deviceManagerOpen ? (
