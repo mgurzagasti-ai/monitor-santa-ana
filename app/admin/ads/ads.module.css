@@ -319,7 +319,7 @@
   width: 104px;
   height: 84px;
   border-radius: 8px;
-  object-fit: cover;
+  object-fit: contain;
   background: #eef3f1;
 }
 
