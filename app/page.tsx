@@ -169,6 +169,7 @@ export default function Home() {
   const [operatorPassword, setOperatorPassword] = useState("");
   const [confirmationError, setConfirmationError] = useState("");
   const [selectedFleetLineId, setSelectedFleetLineId] = useState("");
+  const [selectedOperationalStatus, setSelectedOperationalStatus] = useState<OperationalStatus | null>(null);
   const [fleetSearch, setFleetSearch] = useState("");
   const [stopDraft, setStopDraft] = useState<StopDraft>({
     name: "",
@@ -235,10 +236,23 @@ export default function Home() {
     return (configuredVehicles.length > 0 ? configuredVehicles : fallbackVehicles).sort(compareInternalNumbers);
   }, [configuredMonitorDevices, fleet.vehicles, lineRoutesWithPaths]);
 
+  const operationalStatusCounts = useMemo(() => {
+    return fleetListVehicles.reduce<Record<OperationalStatus, number>>(
+      (counts, vehicle) => {
+        counts[vehicle.operationalStatus] += 1;
+        return counts;
+      },
+      { EN_SERVICIO: 0, TALLER: 0, FUERA_DE_SERVICIO: 0 }
+    );
+  }, [fleetListVehicles]);
+
   const visibleFleetListVehicles = useMemo(() => {
-    if (selectedFleetLineIds.length === 0) return fleetListVehicles;
-    return fleetListVehicles.filter((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId));
-  }, [fleetListVehicles, selectedFleetLineIds]);
+    return fleetListVehicles.filter((vehicle) => {
+      const matchesLine = selectedFleetLineIds.length === 0 || selectedFleetLineIds.includes(vehicle.assignedLineId);
+      const matchesStatus = selectedOperationalStatus === null || vehicle.operationalStatus === selectedOperationalStatus;
+      return matchesLine && matchesStatus;
+    });
+  }, [fleetListVehicles, selectedFleetLineIds, selectedOperationalStatus]);
 
   const searchedFleetListVehicles = useMemo(() => {
     const search = fleetSearch.trim().toLowerCase();
@@ -247,9 +261,12 @@ export default function Home() {
   }, [fleetSearch, visibleFleetListVehicles]);
 
   const visibleFleetVehicles = useMemo(() => {
-    if (selectedFleetLineIds.length === 0) return fleet.vehicles;
-    return fleet.vehicles.filter((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId ?? ""));
-  }, [fleet.vehicles, selectedFleetLineIds]);
+    return fleet.vehicles.filter((vehicle) => {
+      const matchesLine = selectedFleetLineIds.length === 0 || selectedFleetLineIds.includes(vehicle.assignedLineId ?? "");
+      const matchesStatus = selectedOperationalStatus === null || normalizeOperationalStatus(vehicle.operationalStatus) === selectedOperationalStatus;
+      return matchesLine && matchesStatus;
+    });
+  }, [fleet.vehicles, selectedFleetLineIds, selectedOperationalStatus]);
 
   const selectedVehicle = useMemo(() => {
     return visibleFleetListVehicles.find((vehicle) => vehicle.deviceId === selectedDeviceId) ?? visibleFleetListVehicles[0] ?? null;
@@ -757,13 +774,16 @@ export default function Home() {
   }, [selectedVehicle?.assignedLineId, selectedAssignment?.assignedLineId, selectedVehicle?.deviceId]);
 
   useEffect(() => {
-    if (!selectedFleetLineId) return;
+    if (!selectedFleetLineId && selectedOperationalStatus === null) return;
     const selectedIsVisible = fleetListVehicles.some(
-      (vehicle) => vehicle.deviceId === selectedDeviceId && selectedFleetLineIds.includes(vehicle.assignedLineId)
+      (vehicle) =>
+        vehicle.deviceId === selectedDeviceId
+        && (selectedFleetLineIds.length === 0 || selectedFleetLineIds.includes(vehicle.assignedLineId))
+        && (selectedOperationalStatus === null || vehicle.operationalStatus === selectedOperationalStatus)
     );
     if (selectedIsVisible) return;
-    selectVehicle(fleetListVehicles.find((vehicle) => selectedFleetLineIds.includes(vehicle.assignedLineId))?.deviceId ?? null);
-  }, [fleetListVehicles, selectedDeviceId, selectedFleetLineId, selectedFleetLineIds]);
+    selectVehicle(visibleFleetListVehicles[0]?.deviceId ?? null);
+  }, [fleetListVehicles, selectedDeviceId, selectedFleetLineId, selectedFleetLineIds, selectedOperationalStatus, visibleFleetListVehicles]);
 
   return (
     <main className={styles.shell}>
@@ -812,6 +832,30 @@ export default function Home() {
               <strong>{showLineStops ? lineStops.length.toString() : "Ocultas"}</strong>
             </span>
           </button>
+        </section>
+
+        <section className={styles.operationalStatusGrid} aria-label="Filtrar por estado operativo">
+          <OperationalStatusButton
+            icon={<Activity size={18} />}
+            label="En servicio"
+            count={operationalStatusCounts.EN_SERVICIO}
+            active={selectedOperationalStatus === "EN_SERVICIO"}
+            onClick={() => setSelectedOperationalStatus((current) => current === "EN_SERVICIO" ? null : "EN_SERVICIO")}
+          />
+          <OperationalStatusButton
+            icon={<Gauge size={18} />}
+            label="En taller"
+            count={operationalStatusCounts.TALLER}
+            active={selectedOperationalStatus === "TALLER"}
+            onClick={() => setSelectedOperationalStatus((current) => current === "TALLER" ? null : "TALLER")}
+          />
+          <OperationalStatusButton
+            icon={<EyeOff size={18} />}
+            label="Fuera de servicio"
+            count={operationalStatusCounts.FUERA_DE_SERVICIO}
+            active={selectedOperationalStatus === "FUERA_DE_SERVICIO"}
+            onClick={() => setSelectedOperationalStatus((current) => current === "FUERA_DE_SERVICIO" ? null : "FUERA_DE_SERVICIO")}
+          />
         </section>
 
         <label className={styles.field}>
@@ -1348,6 +1392,35 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
         <strong>{value}</strong>
       </span>
     </div>
+  );
+}
+
+function OperationalStatusButton({
+  icon,
+  label,
+  count,
+  active,
+  onClick
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${styles.operationalStatusButton} ${active ? styles.operationalStatusButtonActive : ""}`}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {icon}
+      <span>
+        <small>{label}</small>
+        <strong>{count}</strong>
+      </span>
+    </button>
   );
 }
 
