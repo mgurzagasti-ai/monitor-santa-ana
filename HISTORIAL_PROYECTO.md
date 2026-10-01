@@ -114,6 +114,14 @@ Este archivo resume el estado tecnico del proyecto para poder retomarlo sin depe
 - Commit `c84d328` ajusto el TTL default de fleet a `15 s` para aprovechar GPS fisicos reportando cada `15 s`.
 - No se modificaron CDN, ETA, stale/fresh, polling Android, polling monitor, rate limits ni Traccar en ese commit.
 
+### 2026-10-01 - Filtros operativos en el monitor web
+
+- Se agregaron tarjetas para `EN_SERVICIO`, `TALLER` y `FUERA_DE_SERVICIO` debajo de Recorridos y Paradas.
+- Las tarjetas muestran los conteos actuales y permiten activar o quitar un unico filtro operativo.
+- El filtro se aplica a la lista lateral y a los marcadores del mapa, combinado con el buscador y los filtros de lineas existentes.
+- El cambio es solamente visual; no modifica estados, asignaciones, APIs ni polling.
+- Commit del monitor: `1785028 Add operational status filters to fleet monitor`.
+
 ## Pendientes
 
 - Alinear `.env.example` para documentar `FLEET_CACHE_TTL_SECONDS=15` en lugar de `20`, sin cambiar comportamiento.

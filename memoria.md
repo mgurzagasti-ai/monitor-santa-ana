@@ -579,3 +579,18 @@ pm.cmd run build termino correctamente.
 - El monitor web se dejo deliberadamente en `30 s`; no asumir que todos los clientes deben consultar cada `15 s`.
 - `.env.example` todavia documenta `FLEET_CACHE_TTL_SECONDS=20`; queda pendiente alinearlo a `15`, pero no se cambio ahora.
 - Se creo `HISTORIAL_PROYECTO.md` como resumen tecnico cronologico para retomar el proyecto sin depender del historial del chat.
+
+## 2026-10-01 - Filtros por estado operativo en el monitor
+
+- Se agregaron tres tarjetas de filtro en la columna izquierda del Monitor de flota:
+  - `EN_SERVICIO`;
+  - `TALLER`;
+  - `FUERA_DE_SERVICIO`.
+- Cada tarjeta muestra la cantidad actual de unidades de su estado.
+- El filtro seleccionado se aplica simultaneamente a la lista de colectivos y a los marcadores del mapa.
+- Al volver a pulsar la tarjeta activa se quita el filtro y se muestran nuevamente todas las unidades.
+- El buscador por interno y los filtros de lineas existentes se combinan con el filtro operativo.
+- Es un filtro exclusivamente visual: no modifica estados, asignaciones, endpoints, backend ni polling.
+- Archivos modificados: `app/page.tsx` y `app/page.module.css`.
+- Verificacion: `npm.cmd run build` y `git diff --check` terminaron correctamente.
+- Commit/push realizado: `1785028 Add operational status filters to fleet monitor` en `origin/main`.
