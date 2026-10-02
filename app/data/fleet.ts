@@ -3,6 +3,7 @@ import { readFleetDevices } from "@/app/data/fleetDevices";
 import { lineRoutes } from "@/app/data/lineRoutes";
 import { isRedisConfigured, redisCommand } from "@/app/data/redis";
 import { fetchPositions, getConfig, type TraccarPosition } from "@/app/api/traccar";
+import { hasWheelchairRamp } from "@/app/data/vehicleAccessibility";
 
 export type FleetVehicle = {
   id: number;
@@ -14,6 +15,7 @@ export type FleetVehicle = {
   assignedLineId: string;
   assignedLineName: string;
   operationalStatus: OperationalStatus;
+  hasRamp: boolean;
   latitude: number;
   longitude: number;
   speedKmh: number;
@@ -120,6 +122,7 @@ async function buildFleetSnapshot(): Promise<FleetSnapshot> {
           assignedLineId: assignedLine?.id ?? assignment?.assignedLineId ?? "",
           assignedLineName: assignedLine?.name ?? "",
           operationalStatus: assignment?.operationalStatus ?? "EN_SERVICIO",
+          hasRamp: hasWheelchairRamp(assignment?.internalNumber),
           label: assignment?.label || device.label,
           line: assignedLine?.number ?? device.line,
           color: assignedLine?.color ?? device.color,
