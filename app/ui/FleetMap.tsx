@@ -4,6 +4,9 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { hasWheelchairRamp } from "../data/vehicleAccessibility";
+
+type OperationalStatus = "EN_SERVICIO" | "FUERA_DE_SERVICIO" | "TALLER";
 
 type FleetVehicle = {
   deviceId: number;
@@ -11,6 +14,7 @@ type FleetVehicle = {
   line: string;
   color: string;
   internalNumber?: string;
+  operationalStatus?: OperationalStatus;
   latitude: number;
   longitude: number;
   speedKmh: number;
@@ -248,7 +252,8 @@ function DraftStopMarker({ stop }: { stop: DraftStop }) {
 function useVehicleIcon(vehicle: FleetVehicle) {
   return useMemo(() => {
     const label = escapeHtml(vehicle.internalNumber?.trim() || vehicle.line);
-    const markerColor = "#facc15";
+    const accessible = hasWheelchairRamp(vehicle.internalNumber);
+    const markerColor = operationalStatusColor(vehicle.operationalStatus);
     const course = Number(vehicle.course);
     const rotation = Number.isFinite(course) ? course : 0;
 
@@ -279,12 +284,18 @@ function useVehicleIcon(vehicle: FleetVehicle) {
           box-shadow:0 4px 12px rgba(0,0,0,.32);
           text-align:center;
           line-height:1;
-        ">${label}</div>
+        ">${label}${accessible ? '<span style="position:absolute;right:-5px;bottom:-5px;display:grid;place-items:center;width:20px;height:20px;border:2px solid #fff;border-radius:999px;background:#0f172a;color:#fff;font-size:12px;line-height:1;">♿</span>' : ""}</div>
       </div>`,
       iconSize: [58, 58],
       iconAnchor: [29, 29]
     });
-  }, [vehicle.course, vehicle.internalNumber, vehicle.line]);
+  }, [vehicle.course, vehicle.internalNumber, vehicle.line, vehicle.operationalStatus]);
+}
+
+function operationalStatusColor(status: OperationalStatus | undefined) {
+  if (status === "TALLER") return "#f97316";
+  if (status === "FUERA_DE_SERVICIO") return "#dc2626";
+  return "#16a34a";
 }
 
 function escapeHtml(value: string) {
@@ -317,8 +328,22 @@ function VehicleMarker({ vehicle, onSelect }: { vehicle: FleetVehicle; onSelect:
         <br />
         Linea {vehicle.line}
         <br />
+        {formatOperationalStatus(vehicle.operationalStatus)}
+        {hasWheelchairRamp(vehicle.internalNumber) ? (
+          <>
+            <br />
+            ♿ Unidad con rampa
+          </>
+        ) : null}
+        <br />
         {Math.round(vehicle.speedKmh)} km/h
       </Popup>
     </Marker>
   );
+}
+
+function formatOperationalStatus(status: OperationalStatus | undefined) {
+  if (status === "TALLER") return "Taller";
+  if (status === "FUERA_DE_SERVICIO") return "Fuera de servicio";
+  return "En servicio";
 }

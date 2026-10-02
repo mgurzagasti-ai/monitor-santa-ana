@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, PanelLeftClose, PanelLeftOpen, Plus, Power, RefreshCcw, Save, Satellite, Trash2, X } from "lucide-react";
+import { Activity, Battery, Clock, Eye, EyeOff, Gauge, Map, MapPin, MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Power, RefreshCcw, Save, Satellite, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { compareInternalNumbers } from "./data/vehicleListSort";
+import { hasWheelchairRamp } from "./data/vehicleAccessibility";
 
 const FleetMap = dynamic(() => import("./ui/FleetMap"), { ssr: false });
 const selectedDeviceStorageKey = "santaAnaSelectedDeviceId";
@@ -92,6 +93,12 @@ type VehicleAssignment = {
   operationalStatus: OperationalStatus;
 };
 
+type UnitNote = {
+  internalNumber: string;
+  description: string;
+  updatedAt: string;
+};
+
 type TraccarDevice = {
   id: number;
   name: string;
@@ -171,6 +178,11 @@ export default function Home() {
   const [selectedFleetLineId, setSelectedFleetLineId] = useState("");
   const [selectedOperationalStatus, setSelectedOperationalStatus] = useState<OperationalStatus | null>(null);
   const [fleetSearch, setFleetSearch] = useState("");
+  const [unitNotes, setUnitNotes] = useState<UnitNote[]>([]);
+  const [unitNoteModalOpen, setUnitNoteModalOpen] = useState(false);
+  const [unitNoteDraft, setUnitNoteDraft] = useState("");
+  const [savingUnitNote, setSavingUnitNote] = useState(false);
+  const [unitNoteMessage, setUnitNoteMessage] = useState("");
   const [stopDraft, setStopDraft] = useState<StopDraft>({
     name: "",
     lineId: "",
@@ -306,6 +318,7 @@ export default function Home() {
   }, [assignments, selectedVehicle]);
 
   const selectedRegisteredInternalNumber = selectedVehicle?.internalNumber || selectedAssignment?.internalNumber || "";
+  const selectedUnitNote = unitNotes.find((note) => note.internalNumber === selectedRegisteredInternalNumber) ?? null;
 
   const selectedStopLine = useMemo(() => {
     return lineRoutes.find((line) => line.id === stopDraft.lineId) ?? lineRoutesWithPaths[0] ?? null;
@@ -337,6 +350,42 @@ export default function Home() {
     setPendingConfirmation(null);
     setOperatorPassword("");
     setConfirmationError("");
+  }
+
+  function openUnitNoteModal() {
+    setUnitNoteDraft(selectedUnitNote?.description ?? "");
+    setUnitNoteMessage("");
+    setUnitNoteModalOpen(true);
+  }
+
+  function closeUnitNoteModal() {
+    if (savingUnitNote) return;
+    setUnitNoteModalOpen(false);
+    setUnitNoteMessage("");
+  }
+
+  async function saveSelectedUnitNote() {
+    if (!selectedRegisteredInternalNumber) return;
+    setSavingUnitNote(true);
+    setUnitNoteMessage("");
+    try {
+      const response = await fetch("/api/unit-notes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          internalNumber: selectedRegisteredInternalNumber,
+          description: unitNoteDraft
+        })
+      });
+      const data = (await response.json()) as { notes?: UnitNote[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar la novedad");
+      setUnitNotes(data.notes ?? []);
+      setUnitNoteModalOpen(false);
+    } catch (error) {
+      setUnitNoteMessage(error instanceof Error ? error.message : "No se pudo guardar la novedad");
+    } finally {
+      setSavingUnitNote(false);
+    }
   }
 
   function toggleLineRoute(lineId: string) {
@@ -627,6 +676,13 @@ export default function Home() {
     setAssignments(monitorDevicesToAssignments(localMonitorDevices));
   }
 
+  async function loadUnitNotes() {
+    const response = await fetch("/api/unit-notes", { cache: "no-store" });
+    const data = (await response.json()) as { notes?: UnitNote[]; error?: string };
+    if (!response.ok) throw new Error(data.error ?? "No se pudieron cargar las novedades");
+    setUnitNotes(data.notes ?? []);
+  }
+
   async function loadTraccarDevices() {
     const response = await fetch("/api/devices", { cache: "no-store" });
     const data = (await response.json()) as { devices?: TraccarDevice[]; error?: string };
@@ -754,6 +810,7 @@ export default function Home() {
     loadLineRoutes();
     loadLineStops();
     loadAssignments();
+    loadUnitNotes().catch(() => setUnitNotes([]));
     loadTraccarDevices();
     const timer = window.setInterval(loadFleet, 30000);
     return () => window.clearInterval(timer);
@@ -881,7 +938,12 @@ export default function Home() {
                 {vehicle.line}
               </span>
               <span className={styles.vehicleText}>
-                <strong>{vehicle.label}</strong>
+                <strong>
+                  {vehicle.label}
+                  {hasWheelchairRamp(vehicle.internalNumber) ? (
+                    <span className={styles.accessibilitySymbol} title="Unidad con rampa" aria-label="Unidad con rampa">♿</span>
+                  ) : null}
+                </strong>
                 <small>{vehicle.hasPosition && vehicle.fixTime ? formatDate(vehicle.fixTime) : "Sin posicion GPS"} - {formatOperationalStatus(vehicle.operationalStatus)}</small>
               </span>
               <span className={styles.speed}>{vehicle.hasPosition && typeof vehicle.speedKmh === "number" ? `${Math.round(vehicle.speedKmh)} km/h` : "Sin GPS"}</span>
@@ -961,6 +1023,19 @@ export default function Home() {
                 ))}
               </select>
             </label>
+            {hasWheelchairRamp(selectedRegisteredInternalNumber) ? (
+              <div className={styles.accessibilityDetail}>♿ Unidad con rampa</div>
+            ) : null}
+            {selectedUnitNote ? (
+              <div className={styles.activeUnitNote}>
+                <strong>Novedad activa</strong>
+                <p>{selectedUnitNote.description}</p>
+              </div>
+            ) : null}
+            <button type="button" className={styles.secondaryButton} onClick={openUnitNoteModal}>
+              <MessageSquare size={17} />
+              <span>Novedad / Observacion</span>
+            </button>
             {assignmentMessage ? <p className={styles.editorHint}>{assignmentMessage}</p> : null}
           </section>
         ) : null}
@@ -1173,7 +1248,51 @@ export default function Home() {
           onMapClick={handleStopMapClick}
           onVehicleSelect={selectVehicle}
         />
+        <div className={styles.mapLegend} aria-label="Leyenda del mapa">
+          <span><i className={styles.legendGreen} /> Verde: En servicio</span>
+          <span><i className={styles.legendOrange} /> Naranja: Taller</span>
+          <span><i className={styles.legendRed} /> Rojo: Fuera de servicio</span>
+          <span>♿: Unidad con rampa</span>
+        </div>
       </section>
+
+      {unitNoteModalOpen ? (
+        <div className={styles.modalOverlay} role="presentation">
+          <div className={styles.confirmationModal} role="dialog" aria-modal="true" aria-labelledby="unit-note-title">
+            <div className={styles.modalHeader}>
+              <h2 id="unit-note-title">Novedad / Observacion</h2>
+              <button type="button" onClick={closeUnitNoteModal} title="Cerrar" disabled={savingUnitNote}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className={styles.confirmationDetails}>
+              <p>Interno {selectedRegisteredInternalNumber}. Deja el campo vacio y guarda para eliminar la novedad.</p>
+              <label className={styles.field}>
+                <span>Descripcion</span>
+                <textarea
+                  value={unitNoteDraft}
+                  onChange={(event) => setUnitNoteDraft(event.target.value)}
+                  maxLength={1000}
+                  rows={5}
+                  autoFocus
+                  disabled={savingUnitNote}
+                  placeholder="Unidad en revision de aire acondicionado"
+                />
+              </label>
+              {unitNoteMessage ? <p className={styles.confirmationError}>{unitNoteMessage}</p> : null}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondaryButton} onClick={closeUnitNoteModal} disabled={savingUnitNote}>
+                Cancelar
+              </button>
+              <button type="button" className={styles.primaryButton} onClick={saveSelectedUnitNote} disabled={savingUnitNote}>
+                <Save size={17} />
+                <span>{savingUnitNote ? "Guardando..." : unitNoteDraft.trim() ? "Guardar" : "Eliminar"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {pendingConfirmation ? (
         <div className={styles.modalOverlay} role="presentation">

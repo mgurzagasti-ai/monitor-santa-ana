@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const protectedPaths = ["/", "/api/fleet", "/api/assignments", "/api/line-stops"];
+const protectedPaths = ["/", "/api/fleet", "/api/assignments", "/api/line-stops", "/api/unit-notes"];
 const adsAdminPaths = ["/admin/ads", "/api/admin/ads"];
 const appVersionAdminPaths = ["/admin/app-version", "/api/admin/app-version", "/api/admin/route-geometry"];
 
@@ -63,6 +63,7 @@ export const config = {
     "/api/fleet/:path*",
     "/api/assignments/:path*",
     "/api/line-stops/:path*",
+    "/api/unit-notes/:path*",
     "/admin/ads",
     "/admin/ads/:path*",
     "/api/admin/ads",

@@ -284,6 +284,45 @@
   color: var(--muted);
 }
 
+.accessibilitySymbol {
+  display: inline-block;
+  margin-left: 6px;
+  color: #0f766e;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.accessibilityDetail {
+  padding: 9px 10px;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  background: #f0fdfa;
+  color: #115e59;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.activeUnitNote {
+  padding: 10px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.activeUnitNote strong {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.activeUnitNote p {
+  margin: 5px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .speed {
   color: var(--green);
   font-weight: 700;
@@ -423,6 +462,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -540,7 +580,8 @@
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   min-height: 40px;
   border: 1px solid var(--line);
@@ -549,6 +590,11 @@
   color: var(--text);
   font: inherit;
   padding: 8px 10px;
+}
+
+.field textarea {
+  min-height: 112px;
+  resize: vertical;
 }
 
 .lineGrid {
@@ -620,6 +666,48 @@
   width: 100vw;
   height: 100vh;
   z-index: 0;
+}
+
+.mapLegend {
+  position: absolute;
+  right: 12px;
+  bottom: 24px;
+  z-index: 400;
+  display: grid;
+  gap: 5px;
+  padding: 9px 11px;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.mapLegend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapLegend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.legendGreen {
+  background: #16a34a;
+}
+
+.legendOrange {
+  background: #f97316;
+}
+
+.legendRed {
+  background: #dc2626;
 }
 
 .fleetFilterBar {
