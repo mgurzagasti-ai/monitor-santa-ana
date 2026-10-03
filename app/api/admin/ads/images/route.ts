@@ -51,7 +51,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await del(imagePath);
+    await del(imagePath, {
+      token: process.env.ADS_BLOB_READ_WRITE_TOKEN,
+      storeId: process.env.ADS_BLOB_STORE_ID
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo borrar la imagen";

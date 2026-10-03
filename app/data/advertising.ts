@@ -251,7 +251,10 @@ async function deleteReplacedBlobImage(existing: AdPublication | undefined, publ
 async function deleteBlobImage(pathname: string) {
   if (!pathname) return;
   try {
-    await del(pathname);
+    await del(pathname, {
+      token: process.env.ADS_BLOB_READ_WRITE_TOKEN,
+      storeId: process.env.ADS_BLOB_STORE_ID
+    });
   } catch {
     // A missing blob should not block deleting or saving the publication.
   }
